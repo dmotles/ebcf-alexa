@@ -79,10 +79,14 @@ def get_wod(date):
 _ALIASES = {
     r'DB': r'<sub alias="dumbbell">DB</sub>',
     r'KB': r'<sub alias="kettlebell">KB</sub>',
+    r'EMOM': r'every minute on the minute',
+    r'E(\d)MOM': r'every \1 minutes on the minute',
+    r'HSPU': r'hand stand push ups',
     r'#': r'<sub alias="pounds">#</sub>',
     r'(\d+)"': r'\1<sub alias="inches">"</sub>',
     r'\'': '<sub alias="feet">\'</sub>',
-    r'&': 'and'
+    r'&': 'and',
+    r'(\d+) [Ss]ec\.? ': r'\1 second '
 }
 
 def _inject_aliases(text):

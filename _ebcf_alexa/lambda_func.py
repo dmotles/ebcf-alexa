@@ -2,124 +2,112 @@
 LAMBDA entry point
 """
 from . import wods
-from datetime import datetime, date
+from . import speechlet
+from datetime import datetime, date, timedelta
 
 TODAY = date.today()
+ONEDAY = timedelta(days=1)
 
+# Common phrases
 
-# --------------- Helpers that build all of the responses ----------------------
+WOD_PROMPT = """
+For when do you want the wod for? You can say "yesterday", "today", "tomorrow", "last monday", or give me a specific date.
+You can also say "nevermind" to quit.
+""".strip()
 
-def build_speechlet_response(card_title, card_content, ssml, reprompt, should_end_session):
-    return {
-        'outputSpeech': {
-            'type': 'SSML',
-            'ssml': ssml
-        },
-        'card': {
-            'type': 'Simple',
-            'title': card_title,
-            'content': card_content
-        },
-        'reprompt': {
-            'outputSpeech': {
-                'type': 'PlainText',
-                'text': reprompt
-            }
-        },
-        'shouldEndSession': should_end_session
-    }
-
-
-def build_response(session_attributes, speechlet_response):
-    return {
-        'version': '1.0',
-        'sessionAttributes': session_attributes,
-        'response': speechlet_response
-    }
+WOD_PROMPT_SPEECHLET = speechlet.PlainText(WOD_PROMPT)
 
 
 # --------------- Functions that control the skill's behavior ------------------
 
-def get_welcome_response():
+def get_welcome_response() -> speechlet.SpeechletResponse:
     """ If we wanted to initialize the session to have some attributes we could
     add those here
     """
-    return build_response(
-        session_attributes={},
-        speechlet_response=build_speechlet_response(
-            'Elliott Bay Crossfit',
-            'HAY PEEPS',
-            '<speak>Hello from <emphasis level="strong">Eliott Bay Crossfit</emphasis>. ' +
-            'Ask me what\'s the WOD of the day!</speak>',
-            'Ask me what\'s the WOD of the day, dude.',
-            True
-        )
+    return speechlet.SpeechletResponse(
+        output_speech=speechlet.PlainText('Would you like to know the workout today?'),
+        reprompt=speechlet.PlainText('Would you like to know the workout today?'),
+        should_end=False
     )
 
 
-def handle_session_end_request():
-    return build_response(
-        session_attributes={},
-        speechlet_response=build_speechlet_response(
-            None,
-            None,
-            '<speak>Goodbye.</speak>',
-            None,
-            True
-        )
+def handle_session_end_request() -> speechlet.SpeechletResponse:
+    return speechlet.SpeechletResponse(
+        output_speech=speechlet.PlainText('Goodbye.'),
+        should_end=True
     )
 
 
-def get_wod(intent, session):
+def _get_day_text(date_: date) -> str:
+    if date_ == TODAY:
+        return 'Today'
+    elif date_ == TODAY + ONEDAY:
+        return 'Tomorrow'
+    elif date_ == TODAY - ONEDAY:
+        return 'Yesterday'
+    return '{} {}, {}'.format(date_.strftime('%A %B'), date_.day, date_.year)
+
+
+def _get_speech_for_no_wod(date_: date) -> str:
+    if date_ == TODAY:
+        return 'There is no wod today.'
+    elif date_ == TODAY + ONEDAY:
+        return 'There is no wod tomorrow.'
+    elif date_ == TODAY - ONEDAY:
+        return 'There was no wod yesterday.'
+    date_text = '{} {}, {}.'.format(date_.strftime('%A %B'), date_.day, date_.year)
+    if date_ > TODAY:
+        return 'There is no wod on ' + date_text
+    return 'There was no wod on ' + date_text
+
+
+def get_wod(intent: dict, session: dict) -> speechlet.SpeechletResponse:
     """ Sets the color in the session and prepares the speech to reply to the
     user.
     """
-
     if 'Date' in intent['slots']:
         try:
             date_str = intent['slots']['Date']['value']
             print('Date from intent: %s' % date_str)
-            date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            if not date_str:
+                return speechlet.SpeechletResponse(
+                    output_speech=WOD_PROMPT_SPEECHLET,
+                    reprompt=WOD_PROMPT_SPEECHLET,
+                    should_end=False
+                )
+            date_ = datetime.strptime(date_str, '%Y-%m-%d').date()
         except KeyError:
-            date = TODAY
+            date_ = TODAY
     else:
-        date = TODAY
+        date_ = TODAY
 
-    wod = wods.get_wod(date)
+    wod = wods.get_wod(date_)
     if wod:
         ssml = wod.speech_ssml()
-        print('SSML: %s' % ssml)
-        return build_response(
-            {},
-            build_speechlet_response(
-                'Elliott Bay Crossfit - WOD for %s' % date.isoformat(),
-                wod.pprint(),
-                ssml,
-                'Ask me what is the wod for other days of the week, or what was the wod on a past day!',
-                True
+        return speechlet.SpeechletResponse(
+            output_speech=speechlet.SSML(wod.speech_ssml()),
+            card=speechlet.SimpleCard(
+                title='EBCF WOD for {}'.format(_get_day_text(date_)),
+                content=wod.pprint()
             )
         )
-    return build_response(
-        {},
-        build_speechlet_response(
-            'Elliott Bay Crossfit',
-            'No WOD today...',
-            '<speak>There\'s no WOD today. Ask me what\'s the WOD tomorrow, or what was the WOD yesterday, or what\'s the WOD on monday.</speak>',
-            'Ask me what\'s the WOD tomorrow, yesterday, or Monday.',
-            True
-        )
+    return speechlet.SpeechletResponse(
+        output_speech=speechlet.PlainText(
+            _get_speech_for_no_wod(date_) + ' ' + WOD_PROMPT
+        ),
+        reprompt=WOD_PROMPT_SPEECHLET,
+        should_end=False
     )
-
 
 # --------------- Events ------------------
 
-def on_session_started(session_started_request, session):
+def on_session_started(session_started_request: dict, session: dict) -> None:
     """ Called when the session starts """
     print("on_session_started requestId=" + session_started_request['requestId']
           + ", sessionId=" + session['sessionId'])
 
 
-def on_launch(launch_request, session):
+def on_launch(launch_request: dict, session: dict) -> speechlet.SpeechletResponse:
     """ Called when the user launches the skill without specifying what they
     want
     """
@@ -129,7 +117,7 @@ def on_launch(launch_request, session):
     return get_welcome_response()
 
 
-def on_intent(intent_request, session):
+def on_intent(intent_request: dict, session: dict) -> speechlet.SpeechletResponse:
     """ Called when the user specifies an intent for this skill """
 
     print("on_intent requestId=" + intent_request['requestId'] +
@@ -161,7 +149,7 @@ def on_session_ended(session_ended_request, session):
 
 # --------------- Main handler ------------------
 
-def lambda_handler(event, context):
+def lambda_handler(event, context) -> dict:
     """ Route the incoming request based on type (LaunchRequest, IntentRequest,
     etc.) The JSON body of the request is provided in the event parameter.
     """
@@ -182,9 +170,11 @@ def lambda_handler(event, context):
                            event['session'])
 
     if event['request']['type'] == "LaunchRequest":
-        return on_launch(event['request'], event['session'])
+        return on_launch(event['request'], event['session']).dict()
     elif event['request']['type'] == "IntentRequest":
-        return on_intent(event['request'], event['session'])
+        return on_intent(event['request'], event['session']).dict()
     elif event['request']['type'] == "SessionEndedRequest":
-        return on_session_ended(event['request'], event['session'])
+        on_session_ended(event['request'], event['session'])
+        return handle_session_end_request().dict()
+    raise ValueError('Unknown request type.')
 
