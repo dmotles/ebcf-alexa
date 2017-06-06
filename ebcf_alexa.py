@@ -6,5 +6,5 @@ from pprint import pformat
 
 def lambda_handler(*args, **kwargs):
     ret = lambda_func.lambda_handler(*args, **kwargs)
-    print('RETURNING BACK: %s' % pformat(ret))
+    print('RETURNING BACK: %r' % ret)
     return ret

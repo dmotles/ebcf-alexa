@@ -8,7 +8,7 @@ EBCF_WEBSITE_JSON = r"""
 """.strip()
 
 
-LAMBDA_EVENT = {
+GET_WOD_EVENT = {
     "session": {
         "sessionId": "SessionId.dff1b708-2aeb-4d08-8fa8-aaf549836707",
         "application": {
@@ -38,6 +38,31 @@ LAMBDA_EVENT = {
     "version": "1.0"
 }
 
+YES_INTENT_EVENT = {
+  "session": {
+    "sessionId": "SessionId.d52a4dc9-90fe-4d83-92e0-569ef47832d8",
+    "application": {
+      "applicationId": "amzn1.ask.skill.d6f2f7c4-7689-410d-9c35-8f8baae37969"
+    },
+    "attributes": {"date": "2017-06-02"},
+    "user": {
+      "userId": "amzn1.ask.account.AGF7EUF4RNORLHSZDNU7KR7W75A2GRGQPT6OMHLBACZBLFKZTA2SPNW2UR527IFJRSPTPMMG5F2J64FH67DWLVUYNRDO5IOLQ2OSS22UJAMPG7YLDFDFSMMVQKWUIIIX5PI3RBDV4YGFZN6M5LR2GV52NQND5PJPVHVE3NAYGSGPLNNPDI6PYTKNAQMBJW2KLONN2Z7F77FUZPA"
+    },
+    "new": False
+  },
+  "request": {
+    "type": "IntentRequest",
+    "requestId": "EdwRequestId.6c073620-a9db-4c8e-be8d-ab8d819a525a",
+    "locale": "en-US",
+    "timestamp": "2017-06-06T00:38:36Z",
+    "intent": {
+      "name": "Yes",
+      "slots": {}
+    }
+  },
+  "version": "1.0"
+}
+
 EXPECTED = {
   "version": "1.0",
   "response": {
@@ -62,10 +87,10 @@ EXPECTED = {
 }
 
 
-@pytest.fixture(scope='module')
-def lambda_response():
+@pytest.fixture(scope='module', params=[GET_WOD_EVENT, YES_INTENT_EVENT])
+def lambda_response(request):
     with patch.object(wods, 'urlopen', mock_open(read_data=EBCF_WEBSITE_JSON)):
-        return lambda_handler(LAMBDA_EVENT, NonCallableMagicMock())
+        return lambda_handler(request.param, NonCallableMagicMock())
 
 
 def test_response_has_version(lambda_response):

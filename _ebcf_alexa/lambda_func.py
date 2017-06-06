@@ -11,11 +11,12 @@ ONEDAY = timedelta(days=1)
 # Common phrases
 
 WOD_PROMPT = """
-For when do you want the wod for? You can say "yesterday", "today", "tomorrow", "last monday", or give me a specific date.
-You can also say "nevermind" to quit.
+<speak>For when do you want the wod for?
+You can say <phoneme alphabet="ipa" ph="jɛs.tɚ.deɪ">yesterday</phoneme>,
+today, tomorrow, last monday, or give me a specific date. You can also say nevermind to quit.</speak>
 """.strip()
 
-WOD_PROMPT_SPEECHLET = speechlet.PlainText(WOD_PROMPT)
+WOD_PROMPT_SPEECHLET = speechlet.SSML(WOD_PROMPT)
 
 
 # --------------- Functions that control the skill's behavior ------------------
@@ -25,15 +26,17 @@ def get_welcome_response() -> speechlet.SpeechletResponse:
     add those here
     """
     return speechlet.SpeechletResponse(
-        output_speech=speechlet.PlainText('Would you like to know the workout today?'),
+        output_speech=speechlet.SSML('<speak><emphasis level="strong">Sup</emphasis>. '
+                                     'Would you like to know the workout today?</speak>'),
         reprompt=speechlet.PlainText('Would you like to know the workout today?'),
-        should_end=False
+        should_end=False,
+        attributes={'date': TODAY.isoformat()}
     )
 
 
 def handle_session_end_request() -> speechlet.SpeechletResponse:
     return speechlet.SpeechletResponse(
-        output_speech=speechlet.PlainText('Goodbye.'),
+        output_speech=speechlet.PlainText('Peace out holmes!'),
         should_end=True
     )
 
@@ -61,23 +64,29 @@ def _get_speech_for_no_wod(date_: date) -> str:
     return 'There was no wod on ' + date_text
 
 
+def get_wod_prompt() -> speechlet.SpeechletResponse:
+    return speechlet.SpeechletResponse(
+        output_speech=WOD_PROMPT_SPEECHLET,
+        reprompt=WOD_PROMPT_SPEECHLET,
+        should_end=False
+    )
+
+
 def get_wod(intent: dict, session: dict) -> speechlet.SpeechletResponse:
     """ Sets the color in the session and prepares the speech to reply to the
     user.
     """
-    if 'Date' in intent['slots']:
+    if 'Date' in intent.get('slots', ()):
         try:
             date_str = intent['slots']['Date']['value']
             print('Date from intent: %s' % date_str)
             if not date_str:
-                return speechlet.SpeechletResponse(
-                    output_speech=WOD_PROMPT_SPEECHLET,
-                    reprompt=WOD_PROMPT_SPEECHLET,
-                    should_end=False
-                )
+                return get_wod_prompt()
             date_ = datetime.strptime(date_str, '%Y-%m-%d').date()
         except KeyError:
             date_ = TODAY
+    elif 'date' in session['attributes']:
+        date_ = datetime.strptime(session['attributes']['date'], '%Y-%m-%d').date()
     else:
         date_ = TODAY
 
@@ -129,6 +138,12 @@ def on_intent(intent_request: dict, session: dict) -> speechlet.SpeechletRespons
     # Dispatch to your skill's intent handlers
     if intent_name == "GetWOD":
         return get_wod(intent, session)
+    elif intent_name == 'Yes':
+        if session['new'] or not 'date' in session['attributes']:
+            return get_wod_prompt()
+        return get_wod(intent, session)
+    elif intent_name == 'No':
+        return get_wod_prompt()
     elif intent_name == "AMAZON.HelpIntent":
         return get_welcome_response()
     elif intent_name == "AMAZON.CancelIntent" or intent_name == "AMAZON.StopIntent":

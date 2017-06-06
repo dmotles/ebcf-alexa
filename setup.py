@@ -22,7 +22,6 @@ class Deploy(Command):
         self.lambda_func_name = self.lambda_func_name or self.DEFAULT_LAMBDA_FUNC
 
     def run(self):
-        self.announce('I would be deploying now if I were smart')
         self.spawn(['rm', '-rvf', 'build'])
         self.run_command('build')
         archive_base = 'ebcf_alexa_slug-' + datetime.now().strftime('%Y%m%dT%H%M%S')
