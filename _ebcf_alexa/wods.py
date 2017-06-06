@@ -2,16 +2,33 @@ from urllib.request import urlopen
 from urllib.parse import urlencode
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, date as Date
 import sys
 import re
+from typing import List
 
 LOG = logging.getLogger(__name__)
 
 URL = 'http://www.elliottbaycrossfit.com/api/v1/wods?'
 
 
-def _urlencode_multilevel(obj):
+class WOD(object):
+    def __init__(self, wod_attributes: dict):
+        self.strength_raw = wod_attributes.get('strength', '')
+        self.conditioning_raw = wod_attributes.get('conditioning', '')
+        self.image = wod_attributes.get('image', None)
+
+    def speech_ssml(self) -> str:
+        return '<speak>{}{}</speak>'.format(
+            _convert_ssml(self.strength_raw, 'Strength Section:'),
+            _convert_ssml(self.conditioning_raw, 'Conditioning:')
+        )
+
+    def pprint(self) -> str:
+        return 'Strength:\n{0.strength_raw}\nConditioning:\n{0.conditioning_raw}\nImage: {0.image}'.format(self)
+
+
+def _urlencode_multilevel(obj: dict) -> str:
     """
     EBCF uses PHP-style query args that support nested dictionaries.
 
@@ -45,7 +62,7 @@ def _urlencode_multilevel(obj):
     return urlencode(flattened_params)
 
 
-def get_wod(date):
+def get_wod(date: Date) -> WOD:
     """
     gets the WOD for a specific day.
 
@@ -89,28 +106,33 @@ _ALIASES = {
     r'(\d+) [Ss]ec\.? ': r'\1 second '
 }
 
-def _inject_aliases(text):
+
+def _inject_aliases(text: str) -> str:
     for key, replacement in _ALIASES.items():
         text = re.sub(key, replacement, text)
     return text
 
 
-def _fix_sets(text):
+def _fix_sets(text: str) -> str:
     return re.sub(r'(\d+)x(\d+)', r'\1 sets of \2', text)
 
 
-def _fix_rx(text):
+def _fix_rx(text: str) -> str:
     return re.sub(r'(\d+[#"\'])/(\d+[#"\'])', r'\1 male, \2 female', text)
 
 
-def _massage_for_tts(text):
+def _clean_illegal_ssml_chars(text: str) -> str:
+    return text.replace('&', 'and')
+
+
+def _massage_for_tts(text: str) -> str:
     text = _fix_sets(text)
     text = _fix_rx(text)
     text = _inject_aliases(text)
     return text
 
 
-def _convert_ssml(text, section):
+def _convert_ssml(text: str, section: str) -> str:
     lines = text.splitlines(False)
     section = '<p>%s</p>' % section
     for i in range(len(lines)):
@@ -120,9 +142,9 @@ def _convert_ssml(text, section):
         return ''.join(lines)
 
     # make announcements/all caps/birthdays pause.
-    if lines[0].upper() == lines[0] and not lines[1]:
-        lines[0] = '<p>Announcement: %s</p>' % lines[0]
-        lines[1] = section
+    if lines[0].upper() == lines[0] and not lines[1] or lines[0].endswith('!'):
+        lines[0] = '<p>Announcement: %s</p>' % _clean_illegal_ssml_chars(lines[0])
+        lines.insert(1, section)
         for i in range(2, len(lines)):
             lines[i] = '<s>%s</s>' % _massage_for_tts(lines[i])
     else:
@@ -131,23 +153,8 @@ def _convert_ssml(text, section):
             lines[i] = '<s>%s</s>' % _massage_for_tts(lines[i])
     return ''.join(lines)
 
-class WOD(object):
-    def __init__(self, wod_attributes):
-        self.strength_raw = wod_attributes.get('strength', '')
-        self.conditioning_raw = wod_attributes.get('conditioning', '')
-        self.image = wod_attributes.get('image', None)
 
-    def speech_ssml(self):
-        return '<speak>{}{}</speak>'.format(
-            _convert_ssml(self.strength_raw, 'Strength Section:'),
-            _convert_ssml(self.conditioning_raw, 'Conditioning:')
-        )
-
-    def pprint(self):
-        return 'Strength:\n{0.strength_raw}\nConditioning:\n{0.conditioning_raw}\nImage: {0.image}'.format(self)
-
-
-def _test(argv):
+def _test(argv: List[str]) -> None:
     logging.basicConfig(format='%(levelname)s %(filename)s-%(funcName)s-%(lineno)d: %(message)s', level=logging.DEBUG)
     try:
         date = datetime.strptime(argv[1], '%Y-%m-%d').date()
@@ -161,6 +168,7 @@ def _test(argv):
         print(wod.speech_ssml())
     else:
         print(wod)
+
 
 if __name__ == '__main__':
     _test(sys.argv)

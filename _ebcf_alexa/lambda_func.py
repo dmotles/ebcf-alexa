@@ -4,16 +4,18 @@ LAMBDA entry point
 from . import wods
 from . import speechlet
 from datetime import datetime, date, timedelta
+from pytz import timezone
 
-TODAY = date.today()
+TIMEZONE = timezone('US/Pacific')
+TODAY = datetime.now(tz=TIMEZONE).date()
 ONEDAY = timedelta(days=1)
 
 # Common phrases
 
 WOD_PROMPT = """
-<speak>For when do you want the wod for?
+For when do you want the wod for?
 You can say <phoneme alphabet="ipa" ph="jɛs.tɚ.deɪ">yesterday</phoneme>,
-today, tomorrow, last monday, or give me a specific date. You can also say nevermind to quit.</speak>
+today, tomorrow, last monday, or give me a specific date. You can also say nevermind to quit.
 """.strip()
 
 WOD_PROMPT_SPEECHLET = speechlet.SSML(WOD_PROMPT)
@@ -26,11 +28,11 @@ def get_welcome_response() -> speechlet.SpeechletResponse:
     add those here
     """
     return speechlet.SpeechletResponse(
-        output_speech=speechlet.SSML('<speak><emphasis level="strong">Sup</emphasis>. '
-                                     'Would you like to know the workout today?</speak>'),
+        output_speech=speechlet.SSML('<emphasis level="strong">Sup</emphasis>. '
+                                     'Would you like to know the workout today?'),
         reprompt=speechlet.PlainText('Would you like to know the workout today?'),
         should_end=False,
-        attributes={'date': TODAY.isoformat()}
+        attributes={'date': TODAY.strftime('%Y-%m-%d')}
     )
 
 
@@ -92,7 +94,6 @@ def get_wod(intent: dict, session: dict) -> speechlet.SpeechletResponse:
 
     wod = wods.get_wod(date_)
     if wod:
-        ssml = wod.speech_ssml()
         return speechlet.SpeechletResponse(
             output_speech=speechlet.SSML(wod.speech_ssml()),
             card=speechlet.SimpleCard(
@@ -101,7 +102,7 @@ def get_wod(intent: dict, session: dict) -> speechlet.SpeechletResponse:
             )
         )
     return speechlet.SpeechletResponse(
-        output_speech=speechlet.PlainText(
+        output_speech=speechlet.SSML(
             _get_speech_for_no_wod(date_) + ' ' + WOD_PROMPT
         ),
         reprompt=WOD_PROMPT_SPEECHLET,

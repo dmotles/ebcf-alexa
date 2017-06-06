@@ -22,12 +22,12 @@ class Deploy(Command):
         self.lambda_func_name = self.lambda_func_name or self.DEFAULT_LAMBDA_FUNC
 
     def run(self):
-        self.spawn(['rm', '-rvf', 'build'])
+        #self.spawn(['rm', '-rvf', 'build'])
         self.run_command('build')
+        self.spawn(['pip', 'install', 'pytz', '-t', 'build/lib'])
         archive_base = 'ebcf_alexa_slug-' + datetime.now().strftime('%Y%m%dT%H%M%S')
         archive_path = self.make_archive(archive_base, format='zip', root_dir='build/lib')
         archive_name = os.path.basename(archive_path)
-
         self.spawn(['aws', 's3', 'cp', archive_path, 's3://' + self.s3_bucket + '/' + archive_name])
         self.spawn(['aws', 'lambda', 'update-function-code',
                     '--function-name', self.lambda_func_name,
@@ -46,6 +46,7 @@ setup(
     packages=['_ebcf_alexa'],
     setup_requires=['pytest-runner'],
     tests_require=['pytest'],
+    install_requires=['pytz'],
     cmdclass={'deploy': Deploy},
     py_modules=['ebcf_alexa']
 )

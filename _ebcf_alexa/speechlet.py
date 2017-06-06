@@ -4,7 +4,9 @@ class _Dictable(object):
 
 class SSML(_Dictable):
     def __init__(self, ssml: str):
-        self.ssml = ssml
+        starttag = '<speak>' if not ssml.startswith('<speak>') else ''
+        endtag = '</speak>' if not ssml.endswith('</speak>') else ''
+        self.ssml = ''.join((starttag, ssml, endtag))
 
     def dict(self) -> dict:
         return {
