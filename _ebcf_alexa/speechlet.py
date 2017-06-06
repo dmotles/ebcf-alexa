@@ -42,10 +42,39 @@ class SimpleCard(_Dictable):
         }
 
 
+def _convert_https(url: str) -> str:
+    if url.startswith('http://'):
+        return url.replace('http://', 'https://', 1)
+    return url
+
+
+class StandardCard(SimpleCard):
+    def __init__(self, title: str, content: str, small_image_url: str=None, large_image_url: str=None):
+        super().__init__(title, content)
+        if small_image_url:
+            small_image_url = _convert_https(small_image_url)
+        if large_image_url:
+            large_image_url = _convert_https(large_image_url)
+        self.small_image_url = small_image_url
+        self.large_image_url = large_image_url
+
+    def dict(self) -> dict:
+        x = {
+            'type': 'Standard',
+            'title': self.title,
+            'text': self.content,
+        }
+        if self.small_image_url:
+            x.setdefault('image', {})['smallImageUrl'] = self.small_image_url
+        if self.large_image_url:
+            x.setdefault('image', {})['largeImageUrl'] = self.large_image_url
+        return x
+
+
 class SpeechletResponse(_Dictable):
     def __init__(self,
                  output_speech: _Dictable=None,
-                 card: _Dictable=None,
+                 card: SimpleCard=None,
                  reprompt: _Dictable=None,
                  attributes: dict=None,
                  should_end: bool=True):

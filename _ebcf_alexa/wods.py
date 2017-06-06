@@ -25,7 +25,7 @@ class WOD(object):
         )
 
     def pprint(self) -> str:
-        return 'Strength:\n{0.strength_raw}\nConditioning:\n{0.conditioning_raw}\nImage: {0.image}'.format(self)
+        return 'Strength:\n{0.strength_raw}\nConditioning:\n{0.conditioning_raw}'.format(self)
 
 
 def _urlencode_multilevel(obj: dict) -> str:

@@ -94,12 +94,15 @@ def get_wod(intent: dict, session: dict) -> speechlet.SpeechletResponse:
 
     wod = wods.get_wod(date_)
     if wod:
+        card_title = 'EBCF WOD for ' + _get_day_text(date_)
+        card_content = wod.pprint()
+        if wod.image:
+            card = speechlet.StandardCard(title=card_title, content=card_content, large_image_url=wod.image)
+        else:
+            card = speechlet.SimpleCard(title=card_title, content=card_content)
         return speechlet.SpeechletResponse(
             output_speech=speechlet.SSML(wod.speech_ssml()),
-            card=speechlet.SimpleCard(
-                title='EBCF WOD for {}'.format(_get_day_text(date_)),
-                content=wod.pprint()
-            )
+            card=card
         )
     return speechlet.SpeechletResponse(
         output_speech=speechlet.SSML(
