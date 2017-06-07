@@ -1,0 +1,13 @@
+version: 0.2
+
+phases:
+    pre_build:
+        commands:
+            - echo Running unit tests on `date`
+            - python3 setup.py test
+    build:
+        commands:
+            - echo Build phase running.. noop right now
+    post_build:
+        commands:
+            - echo post_build running.. noop right now
