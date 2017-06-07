@@ -7,7 +7,19 @@ phases:
             - python3 setup.py test
     build:
         commands:
-            - echo Build phase running.. noop right now
-    post_build:
-        commands:
-            - echo post_build running.. noop right now
+            - echo Starting build on `date`
+            - >
+                python3 setup.py install
+                --single-version-externally-managed
+                --root=archive-build-root
+                --install-base=
+                --install-purelib=
+                --install-scripts=
+                --install-data=
+                --install-platbase=
+                --install-headers=
+            - pip install -r requirements.txt -t archive-build-root
+artifacts:
+    files:
+        - '**/*'
+    base-directory: archive-build-root
