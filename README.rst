@@ -6,7 +6,7 @@ ebcf_alexa
 About
 =====
 
-An Alexa skill for `Elliot Bay Crossfit`_. This skill queries the `EBCF WOD API_` (written by `Samantha Brender`_) for a fast lookup of the WOD of the day.
+An Alexa skill for `Elliot Bay Crossfit`_. This skill queries the `EBCF WOD API`_ (written by `Samantha Brender`_) for a fast lookup of the WOD of the day.
 It gently massages the text written by `Rohan`_, the owner, into Alexa-compliant `SSML`_.
 
 
@@ -22,7 +22,7 @@ To run unit tests::
 Deployment
 ==========
 
-I will be rigging up `CodePipelines`_ to auto-deploy changes from this repo's master branch to `AWS Lambda`, where the
+I will be rigging up `CodePipelines`_ to auto-deploy changes from this repo's master branch to `AWS Lambda`_, where the
 code is executed from by the Alexa service. The pipeline should run the unit tests which should guard against breakage.
 
 
@@ -41,5 +41,5 @@ Elliot Bay Crossfit is a trademark of Elliot Bay Crossfit and Rohan P Joseph.
 .. _`SSML`: https://developer.amazon.com/public/solutions/alexa/alexa-skills-kit/docs/speech-synthesis-markup-language-ssml-reference
 .. _`CodePipelines`: https://aws.amazon.com/codepipeline/
 .. _`AWS Lambda`: https://aws.amazon.com/lambda/
-.. _`MIT Licesnse`: https://choosealicense.com/licenses/mit/
+.. _`MIT License`: https://choosealicense.com/licenses/mit/
 .. _`LICENSE`: https://github.com/dmotles/ebcf-alexa/blob/master/LICENSE
