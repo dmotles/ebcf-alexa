@@ -3,11 +3,14 @@ from urllib.parse import urlencode
 import json
 import logging
 from datetime import datetime, date as Date
+from pytz import timezone
 import sys
 import re
-from typing import List
+from typing import List, Iterator
+from . import env
 
 LOG = logging.getLogger(__name__)
+LOG.setLevel(logging.DEBUG)
 
 URL = 'http://www.elliottbaycrossfit.com/api/v1/wods?'
 
@@ -17,6 +20,11 @@ class WOD(object):
         self.strength_raw = wod_attributes.get('strength', '')
         self.conditioning_raw = wod_attributes.get('conditioning', '')
         self.image = wod_attributes.get('image', None)
+        self.datetime = _safe_datetime(wod_attributes.get('date'))
+        self.date = None
+        if self.datetime:
+            self.date = self.datetime.date()
+        self.publish_datetime = _safe_datetime(wod_attributes.get('publishDate'))
 
     def speech_ssml(self) -> str:
         return '<speak>{}{}</speak>'.format(
@@ -26,6 +34,19 @@ class WOD(object):
 
     def pprint(self) -> str:
         return 'Strength:\n{0.strength_raw}\nConditioning:\n{0.conditioning_raw}'.format(self)
+
+    def as_wod_attributes(self) -> dict:
+        return {
+            'strength': self.strength_raw,
+            'conditioning': self.conditioning_raw,
+            'image': self.image,
+            'date': self.datetime.strftime(EBCF_API_TSTAMP_FMT),
+            'publishDate': self.publish_datetime.strftime(EBCF_API_TSTAMP_FMT)
+        }
+
+
+class APIParseError(ValueError):
+    """Thrown when the underlying expectations of the API stop working."""
 
 
 def _urlencode_multilevel(obj: dict) -> str:
@@ -62,35 +83,61 @@ def _urlencode_multilevel(obj: dict) -> str:
     return urlencode(flattened_params)
 
 
+def _call_api(params: dict) -> dict:
+    LOG.debug('EBCF API params: %s', params)
+    query_url = URL + _urlencode_multilevel(params)
+    LOG.debug('HTTP GET %s', query_url)
+    with urlopen(query_url) as f:
+        return json.load(f)
+
+
+def _parse_wod_response(api_response: dict) -> Iterator[WOD]:
+    LOG.debug('EBCF API response: %s', api_response)
+    wod_list = api_response.get('data', [])
+    for wod_data in wod_list:
+        try:
+            yield WOD(wod_data['attributes'])
+        except KeyError:
+            continue
+
+
+EBCF_RANGE_STRF_FMT = '%Y-%m-%dT%H:%M:%S%z'
+
+
+def get_wods_by_range(start_date: datetime, end_date: datetime) -> List[WOD]:
+    """
+    Gets the WOD by publishDate range.
+
+    :param start_date: Start day
+    :param end_date: End day
+    :return: WOD
+    :rtype: WOD
+    """
+    params = {'filter': {'simple': {
+        'publishDate': {
+            '$gt': start_date.strftime(EBCF_RANGE_STRF_FMT),
+            '$lt': end_date.strftime(EBCF_RANGE_STRF_FMT)
+        },
+        'enabled': True
+    }}}
+    return list(_parse_wod_response(_call_api(params)))
+
+
 def get_wod(date: Date) -> WOD:
     """
     gets the WOD for a specific day.
 
     :param datetime.date date: the date
     :returns: wod data or None if not found
-    :rtype: dict
+    :rtype: WOD
     """
     params = {'filter': {'simple': {
-        'date': date.isoformat() + 'T00:00:00.000Z',
+        'date': date.strftime('%Y-%m-%d') + 'T00:00:00.000Z',
         'enabled': True
     }}}
-    LOG.debug('Getting WOD with params: %s', params)
-    query_url = URL + _urlencode_multilevel(params)
-    LOG.debug('HTTP GET %s', query_url)
-    with urlopen(query_url) as f:
-        response = json.load(f)
-    for wod_response in response['data']:
-        LOG.debug(wod_response)
-        try:
-            wod_datetime = datetime.strptime(
-                wod_response['attributes']['date'],
-                '%Y-%m-%dT%H:%M:%S.000Z'
-            )
-        except KeyError:
-            LOG.error('WOD did not contain date attribute: %s', wod_response)
-            continue
-        if date == wod_datetime.date():
-            return WOD(wod_response['attributes'])
+    for wod in _parse_wod_response(_call_api(params)):
+        if wod.date == date:
+            return wod
 
 
 _ALIASES = {
@@ -152,6 +199,23 @@ def _convert_ssml(text: str, section: str) -> str:
         for i in range(1, len(lines)):
             lines[i] = '<s>%s</s>' % _massage_for_tts(lines[i])
     return ''.join(lines)
+
+
+EBCF_API_TSTAMP_FMT = '%Y-%m-%dT%H:%M:%S.000Z'
+
+
+def _safe_datetime(datestr: str) -> datetime:
+    """Tries to convert a timestamp into a datetime object, without crashing.
+
+    :param datestr: date string
+    :returns: datetime object set to UTC or None
+    """
+    if not str:
+        return None
+    try:
+        return env.UTC.localize(datetime.strptime(datestr, EBCF_API_TSTAMP_FMT))
+    except ValueError:
+        return None
 
 
 def _test(argv: List[str]) -> None:

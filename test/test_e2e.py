@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import NonCallableMagicMock, Mock, patch, mock_open
 from _ebcf_alexa import wods
-from _ebcf_alexa.lambda_func import lambda_handler
+from ebcf_alexa import lambda_handler
 
 EBCF_WEBSITE_JSON = r"""
 {"links":{"self":"http://www.elliottbaycrossfit.com/api/v1/wods?filter%5Bsimple%5D%5Bdate%5D=2017-06-01T00%3A00%3A00.000Z&filter%5Bsimple%5D%5Benabled%5D=True"},"data":[{"id":"591f33008961150004cbb9a0","type":"wods","attributes":{"enabled":true,"title":null,"date":"2017-06-02T00:00:00.000Z","publishDate":"2017-06-02T04:00:00.000Z","image":"http://ebcf.s3.amazonaws.com/6-1.jpg","strength":"Hang Power Snatch \n4x3\nDo not drop bar, work at moderate weight, focus on barbell cycling","conditioning":"30 Snatches 115#/95#\n30 Clean & Jerks 115#/95#\n30 Muscle Ups","description":null,"videoId":null},"links":{"self":"http://localhost:4500/api/v1/wods/591f33008961150004cbb9a0"},"relationships":{"tags":{"data":[{"type":"tags","id":"56e61406e17eab8d035f2a1e"},{"type":"tags","id":"56e61406e17eab8d035f2a74"},{"type":"tags","id":"56e61406e17eab8d035f2a4a"},{"type":"tags","id":"572e83adad8b7003006f9ede"},{"type":"tags","id":"591f32f88961150004cbb99f"}],"links":{"self":"http://localhost:4500/api/v1/wods/relationships/tags"}}}}]}
