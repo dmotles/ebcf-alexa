@@ -56,7 +56,7 @@ YES_INTENT_EVENT = {
     "locale": "en-US",
     "timestamp": "2017-06-06T00:38:36Z",
     "intent": {
-      "name": "Yes",
+      "name": "AMAZON.YesIntent",
       "slots": {}
     }
   },
@@ -117,6 +117,3 @@ def test_response_output_speech(output_speech):
     elif output_speech['type'] == 'PlainText':
         assert output_speech['text'].strip()
 
-
-def test_card(lambda_response):
-    assert lambda_response['response']['card']
