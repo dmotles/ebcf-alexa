@@ -141,6 +141,7 @@ def get_wod(date: Date) -> WOD:
 
 
 _ALIASES = {
+    r'OH': r'<sub alias="overhead">OH</sub>',
     r'DB': r'<sub alias="dumbbell">DB</sub>',
     r'KB': r'<sub alias="kettlebell">KB</sub>',
     r'EMOM': r'every minute on the minute',
