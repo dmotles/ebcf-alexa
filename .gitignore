@@ -6,3 +6,5 @@
 .eggs
 build
 dist
+archive-build-root
+target
