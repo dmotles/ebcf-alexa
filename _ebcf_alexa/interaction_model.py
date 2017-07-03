@@ -32,7 +32,7 @@ def _wod_ssml(wod: wods.WOD) -> str:
     if wod:
         if wod.publish_datetime > env.now():
             return '<p>The wod for {} has not been posted yet.</p>'.format(_get_speech_date(wod.date))
-        return wod.speech_ssml()
+        return wod.full_ssml()
     return '<p>There is no workout.</p>'
 
 

@@ -6,7 +6,7 @@ from datetime import datetime, date as Date
 from pytz import timezone
 import sys
 import re
-from typing import List, Iterator
+from typing import List, Iterator, Tuple
 from . import env
 
 LOG = logging.getLogger(__name__)
@@ -15,10 +15,24 @@ LOG.setLevel(logging.DEBUG)
 URL = 'http://www.elliottbaycrossfit.com/api/v1/wods?'
 
 
+def _is_announcement_line(line: str) -> bool:
+    return line.upper() == line or line.endswith('!!')
+
+
+def _split_announcement_and_strength(strength_raw: str) -> Tuple[List[str], List[str]]:
+    announcement = []
+    lines = strength_raw.splitlines(False)
+    while _is_announcement_line(lines[0]):
+        announcement.append(lines.pop(0))
+    return announcement, lines
+
+
 class WOD(object):
     def __init__(self, wod_attributes: dict):
-        self.strength_raw = wod_attributes.get('strength', '')
-        self.conditioning_raw = wod_attributes.get('conditioning', '')
+        self.announcement_lines, self.strength_lines = _split_announcement_and_strength(
+            wod_attributes.get('strength', '')
+        )
+        self.conditioning_lines = wod_attributes.get('conditioning', '').splitlines(False)
         self.image = wod_attributes.get('image', None)
         self.datetime = _safe_datetime(wod_attributes.get('date'))
         self.date = None
@@ -26,14 +40,53 @@ class WOD(object):
             self.date = self.datetime.date()
         self.publish_datetime = _safe_datetime(wod_attributes.get('publishDate'))
 
-    def speech_ssml(self) -> str:
-        return '{}{}'.format(
-            _convert_ssml(self.strength_raw, 'Strength Section:'),
-            _convert_ssml(self.conditioning_raw, 'Conditioning:')
-        )
+    def announcement_ssml(self) -> str:
+        if self.announcement_lines:
+            ssml_chunks = ['<p>Announcement:']
+            for line in self.announcement_lines:
+                line = line.strip()
+                if line:
+                    ssml_chunks.append('<s>{}</s>'.format(_clean_illegal_ssml_chars(line)))
+                else:
+                    ssml_chunks.append('<break time="500ms"/>')
+            ssml_chunks.append('</p>')
+            return ''.join(ssml_chunks)
+        return ''
+
+    def announcement_pprint(self) -> str:
+        if self.announcement_lines:
+            return 'Announcement:\n' + '\n'.join(self.announcement_lines)
+        return ''
+
+    def strength_ssml(self) -> str:
+        if self.strength_lines:
+            return _convert_ssml(self.strength_lines, 'Strength Section:')
+        return ''
+
+    def strength_pprint(self) -> str:
+        if self.strength_lines:
+            return 'Strength:\n' + '\n'.join(self.strength_lines)
+        return ''
+
+    def conditioning_ssml(self) -> str:
+        if self.conditioning_lines:
+            return _convert_ssml(self.conditioning_lines, 'Conditioning:')
+        return ''
+
+    def conditioning_pprint(self) -> str:
+        if self.conditioning_lines:
+            return 'Conditioning:\n' + '\n'.join(self.conditioning_lines)
+        return ''
+
+    def full_ssml(self) -> str:
+        return self.announcement_ssml() + self.strength_ssml() + self.conditioning_ssml()
 
     def pprint(self) -> str:
-        return 'Strength:\n{0.strength_raw}\nConditioning:\n{0.conditioning_raw}'.format(self)
+        return '\n'.join([
+            self.announcement_pprint(),
+            self.strength_pprint(),
+            self.conditioning_pprint()
+        ])
 
     def as_wod_attributes(self) -> dict:
         return {
@@ -166,7 +219,7 @@ def _fix_sets(text: str) -> str:
 
 
 def _fix_rx(text: str) -> str:
-    return re.sub(r'(\d+[#"\'])/(\d+[#"\'])', r'\1 male, \2 female', text)
+    return re.sub(r'(\d+[#"\'])/(\d+[#"\'])', r'<prosody rate="fast">\1 male, \2 female</prosody>', text)
 
 
 def _clean_illegal_ssml_chars(text: str) -> str:
@@ -180,26 +233,13 @@ def _massage_for_tts(text: str) -> str:
     return text
 
 
-def _convert_ssml(text: str, section: str) -> str:
-    lines = text.splitlines(False)
+def _convert_ssml(lines: List[str], section: str) -> str:
     section = '<p>%s</p>' % section
-    for i in range(len(lines)):
-        lines[i] = lines[i].strip()
-
-    if len(lines) < 2:
-        return ''.join(lines)
-
-    # make announcements/all caps/birthdays pause.
-    if lines[0].upper() == lines[0] and not lines[1] or lines[0].endswith('!'):
-        lines[0] = '<p>Announcement: %s</p>' % _clean_illegal_ssml_chars(lines[0])
-        lines.insert(1, section)
-        for i in range(2, len(lines)):
-            lines[i] = '<s>%s</s>' % _massage_for_tts(lines[i])
-    else:
-        lines.insert(0, section)
-        for i in range(1, len(lines)):
-            lines[i] = '<s>%s</s>' % _massage_for_tts(lines[i])
-    return ''.join(lines)
+    new_lines = [
+        '<s>{}</s>'.format(_massage_for_tts(l))
+        for l in lines
+    ]
+    return section + ''.join(new_lines)
 
 
 EBCF_API_TSTAMP_FMT = '%Y-%m-%dT%H:%M:%S.000Z'
@@ -230,7 +270,7 @@ def _test(argv: List[str]) -> None:
     if wod:
         print(wod.pprint())
         print('SSML:')
-        print(wod.speech_ssml())
+        print(wod.full_ssml())
     else:
         print(wod)
 
