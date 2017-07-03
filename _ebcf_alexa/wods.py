@@ -27,7 +27,7 @@ class WOD(object):
         self.publish_datetime = _safe_datetime(wod_attributes.get('publishDate'))
 
     def speech_ssml(self) -> str:
-        return '<speak>{}{}</speak>'.format(
+        return '{}{}'.format(
             _convert_ssml(self.strength_raw, 'Strength Section:'),
             _convert_ssml(self.conditioning_raw, 'Conditioning:')
         )
