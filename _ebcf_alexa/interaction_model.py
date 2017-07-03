@@ -1,6 +1,12 @@
+"""
+Interaction Model
+
+This module basically maps out the response tree for the skill.
+"""
 from datetime import timedelta, datetime, date
 from operator import attrgetter
 from typing import Union
+from textwrap import dedent
 import logging
 from . import wods
 from . import speechlet
@@ -198,33 +204,75 @@ def get_wod(intent: dict, attributes: dict) -> speechlet.SpeechletResponse:
     )
 
 
-def usage_info(intent: dict, attributes: dict) -> speechlet.SpeechletResponse:
+def help_intent(intent: dict, attributes: dict) -> speechlet.SpeechletResponse:
+    """
+    This is triggered when the user asks for "help".
+
+    :param intent:
+    :param attributes:
+    :return:
+    """
+    ssml = speechlet.SSML(
+        '<speak>'
+        '<s>Ok, Help.</s>'
+        # Init options
+        '<p>First, you can ask me for the workout, strength, or conditioning.</p>'
+        
+        # Yesterday/Tomorrow
+        '<p>You can also add words like yesterday or tomorrow. '
+        '<s>For example, ask me for yesterday’s workout or tomorrow’s conditioning.</s></p>'
+
+        # DOW
+        '<p>You can also include a day of the week. '
+        '<s>For example, ask me for monday’s workout, or friday’s strength.</s></p>'
+
+        # Quit
+        '<p>Finally, you can say nevermind to quit.</p>'
+
+        # Prompt
+        '<s>What will it be?</s>'
+        '</speak>'
+    )
+    card = speechlet.SimpleCard(
+        title='Help',
+        content=dedent(
+            '''
+            Example Phrases:
+            
+            "workout", "strength", "conditioning", "yesterday's workout", "tomorrow's conditioning",
+            "monday's workout", "friday's strength", "nevermind".
+            '''
+        )
+    )
     return speechlet.SpeechletResponse(
-        speechlet.PlainText(
-            'You can ask me things like: '
-            'What\'s the WOD today? What was the WOD on Friday? What\'s the WOD tomorrow? '
-            'You can also say things like "exit", "quit", and "nevermind" to end our conversation. ' 
-            'So, ask me a question. '
-        ),
-        reprompt=speechlet.PlainText(
-            'Ask me a question like: '
-            'What\'s the WOD today? You can also say nevermind to end our conversation. '
-        ),
+        ssml,
+        card=card,
         should_end=False
     )
 
 
 def welcome_msg() -> speechlet.SpeechletResponse:
+    """
+    This is the basic welcome message when the user asks Alexa "Open Elliott Bay Crossfit".
+    :return:
+    """
+
+    ssml = speechlet.SSML(
+        '<speak>'
+        '<s>Elliott Bay Crossfit.</s>'
+        '<s>You can ask me for the workout, strength, or conditioning.</s>'
+        '<s>You can also ask for help.</s>'
+        '<s>Which will it be?</s>'
+        '</speak>'
+    )
     return speechlet.SpeechletResponse(
-        speechlet.PlainText('Would you like me to lookup the WOD of the day?'),
-        reprompt=speechlet.PlainText('Would you like me to lookup the WOD of the day?'),
-        should_end=False,
-        attributes={
-            'state': 'YES_NO_QUESTION_ASKED',
-            'ifYes': {
-                'action': 'GET_TODAYS_WOD'
-            }
-        }
+        ssml,
+        card=speechlet.SimpleCard(
+            title='Elliott Bay Crossfit',
+            content='You can ask me for the "workout", "strength", or "conditioning".'
+            ' You can also ask for "help". Which will it be?'
+        ),
+        should_end=False
     )
 
 
@@ -249,7 +297,7 @@ INTENT_MODEL = {
         'YES_NO_QUESTION_ASKED': no_answer
     },
     'AMAZON.HelpIntent': {
-        'default': usage_info,
+        'default': help_intent,
     },
     'AMAZON.CancelIntent': {
         'default': goodbye
