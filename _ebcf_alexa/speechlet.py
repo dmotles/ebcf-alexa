@@ -1,3 +1,5 @@
+from typing import Union
+
 class _Dictable(object):
     def dict(self) -> dict:
         return {}
@@ -27,6 +29,9 @@ class PlainText(_Dictable):
 
     def to_ssml(self) -> SSML:
         return SSML('<speak>%s</speak>' % self.text)
+
+
+SpeechType = Union[SSML, PlainText]
 
 
 class SimpleCard(_Dictable):
@@ -73,9 +78,9 @@ class StandardCard(SimpleCard):
 
 class SpeechletResponse(_Dictable):
     def __init__(self,
-                 output_speech: _Dictable=None,
+                 output_speech: SpeechType=None,
                  card: SimpleCard=None,
-                 reprompt: _Dictable=None,
+                 reprompt: SpeechType=None,
                  attributes: dict=None,
                  should_end: bool=True):
         self.output_speech = output_speech
