@@ -7,6 +7,7 @@ from datetime import timedelta, datetime, date
 from operator import attrgetter
 from typing import Union
 from textwrap import dedent
+from enum import Enum
 import logging
 from . import wods
 from . import speechlet
@@ -16,30 +17,45 @@ LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.DEBUG)
 
 
+class QueryType(Enum):
+    WORKOUT = 1
+    STRENGTH = 2
+    CONDITIONING = 3
+
+    @property
+    def pname(self):
+        return self.name[0] + self.name[1:].lower()
+
+
 def _get_speech_date(d: Union[date, datetime]) -> str:
     return '{} {}, {}'.format(d.strftime('%A %B'), d.day, d.year)
 
 
-def _confirm_choice(should_confirm: bool, relative_qualifier: str, query: str) -> str:
+def _confirm_choice(should_confirm: bool, relative_qualifier: str, query: QueryType) -> str:
     if should_confirm:
         if relative_qualifier:
-            return '<p>OK, {}\'s {}</p>'.format(relative_qualifier, query)
-        return '<p>OK, {}.</p>'.format(query)
+            return '<p>OK, {}\'s {}</p>'.format(relative_qualifier, query.name.lower())
+        return '<p>OK, {}.</p>'.format(query.name.lower())
     return ''
 
 
-def _wod_ssml(wod: wods.WOD) -> str:
-    if wod:
-        if wod.publish_datetime > env.now():
-            return '<p>The wod for {} has not been posted yet.</p>'.format(_get_speech_date(wod.date))
-        return wod.full_ssml()
-    return '<p>There is no workout.</p>'
+def _wod_ssml(wod: wods.WOD, query_type: QueryType) -> str:
+    if query_type == QueryType.CONDITIONING:
+        return wod.conditioning_ssml()
+    elif query_type == QueryType.STRENGTH:
+        return wod.strength_ssml()
+    return wod.full_ssml()
 
 
-def _wod_card(wod: wods.WOD, relative_qualifier: str, query_type: str) -> speechlet.SimpleCard:
-    card_content = wod.pprint()
-    card_title = '{} for {}'.format(query_type, relative_qualifier) if relative_qualifier else query_type
-    if wod.image:
+def _wod_card(wod: wods.WOD, query_type: QueryType) -> speechlet.SimpleCard:
+    card_title = '{} for {}'.format(query_type.pname, _get_speech_date(wod.date))
+    if query_type == QueryType.STRENGTH:
+        card_content = wod.strength_pprint()
+    elif query_type == QueryType.CONDITIONING:
+        card_content = wod.conditioning_pprint()
+    else:
+        card_content = wod.pprint()
+    if wod.image and query_type == QueryType.WORKOUT: # full workout w/ announcement, show pic
         return speechlet.StandardCard(title=card_title, content=card_content, large_image_url=wod.image)
     return speechlet.SimpleCard(title=card_title, content=card_content)
 
@@ -65,24 +81,59 @@ def query_intent(intent: dict, attributes: dict) -> speechlet.SpeechletResponse:
     try:
         relative_qualifier = intent['slots']['RelativeQualifier']['value']
     except KeyError:
-        relative_qualifier = None
+        try:
+            relative_qualifier = attributes['RelativeQualifier']
+        except KeyError:
+            relative_qualifier = None
     try:
         query_type = intent['slots']['Query']['value']
     except KeyError:
-        query_type = None
-
-    wod = wods.get_wod(env.localdate())
-    ssml = speechlet.SSML(
-        '<speak>' +
-        _confirm_choice(attributes.get('confirm_choice', False), relative_qualifier, query_type) +
-        _wod_ssml(wod)
-    )
-    card = _wod_card(wod, relative_qualifier, query_type)
-    return speechlet.SpeechletResponse(
-        ssml,
-        card=card,
-        should_end=True
-    )
+        try:
+            query_type = attributes['Query']
+        except KeyError:
+            query_type = None
+    target_date = env.localdate()
+    if query_type:
+        if 'strength' in query_type.lower():
+            qt = QueryType.STRENGTH
+        elif 'condition' in query_type.lower():
+            qt = QueryType.CONDITIONING
+        else:
+            qt = QueryType.WORKOUT
+        ssml_txt = '<speak>' + _confirm_choice(attributes.get('confirm_choice', False), relative_qualifier, qt)
+        wod = wods.get_wod(target_date)
+        if wod:
+            if wod.publish_datetime < env.now():
+                ssml_txt += _wod_ssml(wod, qt)
+                card = _wod_card(wod, qt)
+            else:
+                ssml_txt += '<p>The wod for {} has not been posted yet.</p>'.format(_get_speech_date(wod.date))
+                card = speechlet.SimpleCard(
+                    title='{} for {}'.format(qt.pname, _get_speech_date(wod.date)),
+                    content='Not posted yet.'
+                )
+        else:
+            ssml_txt += '<p>No workout was found for {}</p>'.format(_get_speech_date(target_date))
+            card = speechlet.SimpleCard(
+                title='{} for {}'.format(qt.pname, _get_speech_date(target_date)),
+                content='Not found.'
+            )
+        return speechlet.SpeechletResponse(
+            speechlet.SSML(ssml_txt + '</speak>'),
+            card=card,
+            should_end=True
+        )
+    else:
+        ssml_txt = 'You can say workout, strength, or conditioning. Which do you want?'
+        if relative_qualifier:
+            ssml_txt = 'I\'m not sure what you want for {}. '.format(relative_qualifier) + ssml_txt
+        return speechlet.SpeechletResponse(
+            speechlet.SSML(ssml_txt),
+            should_end=False,
+            attributes={
+                'RelativeQualifier': relative_qualifier
+            }
+        )
 
 
 def help_intent(intent: dict, attributes: dict) -> speechlet.SpeechletResponse:
