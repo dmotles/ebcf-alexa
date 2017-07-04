@@ -98,6 +98,11 @@ def test_standard_card(kwargs1: dict,
 
 
 def test_speechlet_response_default():
+    """
+    This implicitly tests no args to SpeechletResponse, as well as the baseline schema.
+
+    :return:
+    """
     assert speechlet.SpeechletResponse().dict() == {
         'version': '1.0',
         'response': {'shouldEndSession': True},
@@ -109,3 +114,26 @@ def test_speechlet_response_default():
 def test_speechlet_response_should_end(_input: bool):
     s = speechlet.SpeechletResponse(should_end=_input)
     assert s.dict()['response']['shouldEndSession'] == _input
+
+
+def test_speechlet_response_attributes():
+    s = speechlet.SpeechletResponse(attributes={'testkey': 'testval'})
+    assert s.dict()['sessionAttributes'] == {'testkey': 'testval'}
+
+
+def test_speechlet_response_output_speech():
+    os = speechlet.PlainText('test')
+    sr = speechlet.SpeechletResponse(os)
+    assert sr.dict()['response']['outputSpeech'] == os.dict()
+
+
+def test_speechlet_response_reprompt():
+    os = speechlet.PlainText('test')
+    sr = speechlet.SpeechletResponse(reprompt=os)
+    assert sr.dict()['response']['reprompt']['outputSpeech'] == os.dict()
+
+
+def test_speechlet_response_card():
+    card = speechlet.SimpleCard(title='test', content='content')
+    sr = speechlet.SpeechletResponse(card=card)
+    assert sr.dict()['response']['card'] == card.dict()
