@@ -46,8 +46,11 @@ def _split_announcement_and_strength(strength_raw: str) -> Tuple[List[str], List
     if not strength_raw:
         return [], []
     announcement = []
-    lines = strength_raw.splitlines(False)
-    while _is_announcement_line(lines[0]):
+    lines = [l.strip() for l in strength_raw.splitlines(False)]
+    # while we have lines to parse (whole strength can be an announcement)
+    # and the line is an announcement line or empty line (multiple announcements
+    # can be split by an empty line)
+    while lines and (_is_announcement_line(lines[0]) or not lines[0]):
         announcement.append(lines.pop(0))
     return announcement, lines
 
