@@ -3,7 +3,6 @@ from urllib.parse import urlencode
 import json
 import logging
 from datetime import datetime, date as Date
-from pytz import timezone
 import sys
 import re
 from typing import List, Iterator, Tuple
