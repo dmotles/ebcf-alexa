@@ -151,7 +151,7 @@ def _urlencode_multilevel(obj: dict) -> str:
         elif isinstance(obj, list):
             for i, val in enumerate(obj):
                 encode_key = '{}[{}]'.format(parent_key, i)
-                sub_params[encode_key] = obj[child_key]
+                sub_params[encode_key] = val
         else:
             flattened_params[parent_key] = obj
         for k, v in sub_params.items():
