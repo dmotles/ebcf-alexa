@@ -93,10 +93,12 @@ def lambda_response(request):
         return lambda_handler(request.param, NonCallableMagicMock())
 
 
+@pytest.mark.xfail(reason='currently none of these intents are supported')
 def test_response_has_version(lambda_response):
     assert lambda_response['version'] == '1.0'
 
 
+@pytest.mark.xfail(reason='currently none of these intents are supported')
 def test_response_has_sessionAttributes(lambda_response):
     assert lambda_response['sessionAttributes'] == {}
 
@@ -109,6 +111,7 @@ def output_speech(lambda_response, request):
     return request.param(lambda_response['response'])
 
 
+@pytest.mark.xfail(reason='currently none of these intents are supported')
 def test_response_output_speech(output_speech):
     assert output_speech['type'] in ('SSML', 'PlainText')
     if output_speech['type'] == 'SSML':
