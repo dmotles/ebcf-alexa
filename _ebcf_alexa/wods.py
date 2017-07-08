@@ -16,7 +16,18 @@ URL = 'http://www.elliottbaycrossfit.com/api/v1/wods?'
 
 
 def _is_announcement_line(line: str) -> bool:
-    return line.upper() == line or line.endswith('!!')
+    """
+    Is a line of text considered an announcement line?
+
+    Examples:
+
+    HAPPY BIRTHDAY <person>!!!!
+    NO CLASSES <>
+
+    :param line: line to check
+    :return: if the line matches an expected pattern
+    """
+    return bool(line) and (line.upper() == line or line.endswith('!!'))
 
 
 def _split_announcement_and_strength(strength_raw: str) -> Tuple[List[str], List[str]]:
