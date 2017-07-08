@@ -62,7 +62,7 @@ class WOD(object):
         self.announcement_lines, self.strength_lines = _split_announcement_and_strength(
             wod_attributes.get('strength', '')
         )
-        self.conditioning_lines = wod_attributes.get('conditioning', '').splitlines(False)
+        self.conditioning_lines = wod_attributes.get('conditioning', '').strip().splitlines(False)
         self.image = wod_attributes.get('image', None)
         self.datetime = _safe_datetime(wod_attributes.get('date'))
         self.date = None
