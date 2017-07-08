@@ -55,6 +55,9 @@ def _split_announcement_and_strength(strength_raw: str) -> Tuple[List[str], List
 
 
 class WOD(object):
+    """
+    Class representing a WOD from the EBCF API.
+    """
     def __init__(self, wod_attributes: dict):
         self.announcement_lines, self.strength_lines = _split_announcement_and_strength(
             wod_attributes.get('strength', '')
