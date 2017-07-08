@@ -31,6 +31,20 @@ def _is_announcement_line(line: str) -> bool:
 
 
 def _split_announcement_and_strength(strength_raw: str) -> Tuple[List[str], List[str]]:
+    """
+    Split the strength section into 2 sections: announcements and the actual
+    strength training workout.
+
+    Rohan sometimes starts the description of the strength training
+    section with an announcement, like wishing someone happy birthday
+    or announcing that a class is canceled.
+
+    :param strength_raw: The raw strength text from the API
+    :return: 2-tuple with the strength and announcements split by line
+    """
+    strength_raw = strength_raw.strip()
+    if not strength_raw:
+        return [], []
     announcement = []
     lines = strength_raw.splitlines(False)
     while _is_announcement_line(lines[0]):
