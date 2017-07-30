@@ -281,7 +281,7 @@ def _safe_datetime(datestr: str) -> datetime:
     :param datestr: date string
     :returns: datetime object set to UTC or None
     """
-    if not str:
+    if not datestr:
         return None
     try:
         return env.UTC.localize(datetime.strptime(datestr, EBCF_API_TSTAMP_FMT))
