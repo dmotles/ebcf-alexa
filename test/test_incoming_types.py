@@ -111,3 +111,4 @@ VALID_CANCEL_INTENT_EVENT = {
 def test_cancel_intent():
     req = incoming_types.LambdaEvent(VALID_CANCEL_INTENT_EVENT)
     assert req.request.intent.name == 'AMAZON.CancelIntent'
+    str(req.request) # does not crash

@@ -172,10 +172,12 @@ class _Intent(object):
         return '<{} "{}">'.format(self.__class__.__name__, self.name)
 
     def __str__(self):
-        return '{}({})'.format(
-            self.name,
-            ', '.join('{}={}'.format(slot_name, slot)
-                      for slot_name, slot in self.slots.items()))
+        slotstr = ''
+        if self.slots:
+            slotstr = ', '.join(
+                '{}={}'.format(slot_name, slot)
+                for slot_name, slot in self.slots.items())
+        return '{}({})'.format(self.name, slotstr)
 
 
 class _AlexaIntentRequest(_BaseAlexaRequest):
