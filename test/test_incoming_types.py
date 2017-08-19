@@ -88,3 +88,26 @@ def test_launch_request():
     assert req.request.type == incoming_types.RequestTypes.LaunchRequest
     assert req.session.new
 
+
+VALID_CANCEL_INTENT_EVENT = {
+    'version': '1.0',
+    'session': {'new': False, 'sessionId': 'amzn1.echo-api.session.3fea2408-d1ed-44b2-8343-42106601e585',
+                'application': {'applicationId': 'amzn1.ask.skill.d6f2f7c4-7689-410d-9c35-8f8baae37969'}, 'user': {
+            'userId': 'amzn1.ask.account.XXXXXX'}},
+    'context': {'AudioPlayer': {'playerActivity': 'STOPPED'}, 'Display': {'token': ''},
+                'System': {'application': {'applicationId': 'amzn1.ask.skill.d6f2f7c4-7689-410d-9c35-8f8baae37969'},
+                           'user': {
+                               'userId': 'amzn1.ask.account.XXXXXX'},
+                           'device': {
+                               'deviceId': 'amzn1.ask.device.XXXXXXX',
+                               'supportedInterfaces': {'AudioPlayer': {},
+                                                       'Display': {'templateVersion': '1.0', 'markupVersion': '1.0'},
+                                                       'VideoApp': {}}}, 'apiEndpoint': 'https://api.amazonalexa.com'}},
+    'request': {'type': 'IntentRequest', 'requestId': 'amzn1.echo-api.request.6cdc55fe-d1be-46bc-b315-0f1a779a24b6',
+                'timestamp': '2017-08-19T20:08:35Z', 'locale': 'en-US',
+                'intent': {'name': 'AMAZON.CancelIntent', 'confirmationStatus': 'NONE'}}}
+
+
+def test_cancel_intent():
+    req = incoming_types.LambdaEvent(VALID_CANCEL_INTENT_EVENT)
+    assert req.request.intent.name == 'AMAZON.CancelIntent'

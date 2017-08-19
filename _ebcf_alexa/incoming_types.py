@@ -40,7 +40,7 @@ class _RequestSession(object):
     session_id: str
     """A string that represents a unique identifier per a user’s active session."""
 
-    attributes: Optional[Dict[str, dict]]
+    attributes: Optional[Dict[str, dict]] = None
     """A map of key-value pairs. The attributes map is empty for requests where a
     new session has started with the property new set to true."""
 
@@ -154,7 +154,7 @@ class _Slot(object):
 class _Intent(object):
     name: str
 
-    slots: Dict[str, _Slot]
+    slots: Optional[Dict[str, _Slot]] = None
     """
     A map of key-value pairs that further describes what the user meant based on a predefined intent schema.
     The map can be empty.
@@ -162,10 +162,11 @@ class _Intent(object):
 
     def __init__(self, i: dict):
         self.name = i['name']
-        self.slots = {
-            k: _Slot(v)
-            for k, v in i['slots'].items()
-        }
+        if 'slots' in i:
+            self.slots = {
+                k: _Slot(v)
+                for k, v in i['slots'].items()
+            }
 
     def __repr__(self):
         return '<{} "{}">'.format(self.__class__.__name__, self.name)
