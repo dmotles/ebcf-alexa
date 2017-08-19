@@ -9,7 +9,7 @@ VALID_INTENT_LAMBDA_EVENT = {
     },
     "attributes": {},
     "user": {
-      "userId": "amzn1.ask.account.AGF7EUF4RNORLHSZDNU7KR7W75A2GRGQPT6OMHLBACZBLFKZTA2SPNW2UR527IFJRSPTPMMG5F2J64FH67DWLVUYNRDO5IOLQ2OSS22UJAMPG7YLDFDFSMMVQKWUIIIX5PI3RBDV4YGFZN6M5LR2GV52NQND5PJPVHVE3NAYGSGPLNNPDI6PYTKNAQMBJW2KLONN2Z7F77FUZPA"
+      "userId": "amzn1.ask.account.XXXXX"
     }
   },
   "request": {
@@ -35,7 +35,7 @@ VALID_INTENT_LAMBDA_EVENT = {
         "applicationId": "amzn1.ask.skill.d6f2f7c4-7689-410d-9c35-8f8baae37969"
       },
       "user": {
-        "userId": "amzn1.ask.account.AGF7EUF4RNORLHSZDNU7KR7W75A2GRGQPT6OMHLBACZBLFKZTA2SPNW2UR527IFJRSPTPMMG5F2J64FH67DWLVUYNRDO5IOLQ2OSS22UJAMPG7YLDFDFSMMVQKWUIIIX5PI3RBDV4YGFZN6M5LR2GV52NQND5PJPVHVE3NAYGSGPLNNPDI6PYTKNAQMBJW2KLONN2Z7F77FUZPA"
+        "userId": "amzn1.ask.account.XXXXX"
       },
       "device": {
         "supportedInterfaces": {}
@@ -64,15 +64,15 @@ VALID_LAUNCH_REQUEST_LAMBDA_EVENT = {
         'application': {
             'applicationId': 'amzn1.ask.skill.d6f2f7c4-7689-410d-9c35-8f8baae37969'},
         'user': {
-            'userId': 'amzn1.ask.account.AGF7EUF4RNORLHSZDNU7KR7W75A2GRGQPT6OMHLBACZBLFKZTA2SPNW2UR527IFJRSPTPMMG5F2J64FH67DWLVUYNRDO5IOLQ2OSS22UJAMPG7YLDFDFSMMVQKWUIIIX5PI3RBDV4YGFZN6M5LR2GV52NQND5PJPVHVE3NAYGSGPLNNPDI6PYTKNAQMBJW2KLONN2Z7F77FUZPA'}},
+            'userId': 'amzn1.ask.account.XXXXX'}},
     'context': {
         'AudioPlayer': {'playerActivity': 'STOPPED'}, 'Display': {},
         'System': {'application': {
             'applicationId': 'amzn1.ask.skill.d6f2f7c4-7689-410d-9c35-8f8baae37969'},
             'user': {
-                'userId': 'amzn1.ask.account.AGF7EUF4RNORLHSZDNU7KR7W75A2GRGQPT6OMHLBACZBLFKZTA2SPNW2UR527IFJRSPTPMMG5F2J64FH67DWLVUYNRDO5IOLQ2OSS22UJAMPG7YLDFDFSMMVQKWUIIIX5PI3RBDV4YGFZN6M5LR2GV52NQND5PJPVHVE3NAYGSGPLNNPDI6PYTKNAQMBJW2KLONN2Z7F77FUZPA'},
+                'userId': 'amzn1.ask.account.XXXXXX'},
             'device': {
-                'deviceId': 'amzn1.ask.device.AF3BKRU7L7QWY4SWLD23Q3EL6QL2CIFHXTWP3RLNAZS7UVCBQLDLLISPWSP744BPXUB5C2FMYK4NXKWORAQ73E4GVCMCWQXNCZ64EE7VNXAHIJDR5LXD3EC6CXBJK7UIMGO3PRBM3E22NJ7VWNU2GVZA5V7A',
+                'deviceId': 'amzn1.ask.device.XXXXX',
                 'supportedInterfaces': {'AudioPlayer': {}, 'Display': {
                     'templateVersion': '1.0', 'markupVersion': '1.0'},
                                         'VideoApp': {}}},
