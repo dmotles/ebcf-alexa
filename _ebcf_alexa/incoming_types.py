@@ -40,7 +40,7 @@ class _RequestSession(object):
     session_id: str
     """A string that represents a unique identifier per a user’s active session."""
 
-    attributes: Dict[str, dict]
+    attributes: Optional[Dict[str, dict]]
     """A map of key-value pairs. The attributes map is empty for requests where a
     new session has started with the property new set to true."""
 
@@ -59,7 +59,7 @@ class _RequestSession(object):
         """
         self.new = s['new']
         self.session_id = s['sessionId']
-        self.attributes = s['attributes']
+        self.attributes = s.get('attributes')
         self.application = _RequestApplication(s['application'])
         self.user = _RequestUser(s['user'])
 
