@@ -4,139 +4,165 @@ Interaction Model
 This module basically maps out the response tree for the skill.
 """
 from datetime import timedelta, datetime, date
-from operator import attrgetter
-from typing import Union
+from typing import Union, Optional, Set, Tuple
 from textwrap import dedent
 from enum import Enum
 import logging
 from . import wods
 from . import speechlet
 from . import env
+from .incoming_types import RequestTypes, LambdaEvent, Intent, Slot
 
 LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.DEBUG)
 
-
-class QueryType(Enum):
-    WORKOUT = 1
-    STRENGTH = 2
-    CONDITIONING = 3
-
-    @property
-    def pname(self):
-        return self.name[0] + self.name[1:].lower()
+DEFAULT_QUERY_INTENT = 'DefaultQuery'
+REQUEST_SLOT = 'RequestType'
+RELATIVE_SLOT = 'RelativeTo'
 
 
 def _get_speech_date(d: Union[date, datetime]) -> str:
     return '{} {}, {}'.format(d.strftime('%A %B'), d.day, d.year)
 
 
-def _confirm_choice(should_confirm: bool, relative_qualifier: str, query: QueryType) -> str:
-    if should_confirm:
-        if relative_qualifier:
-            return '<p>OK, {}\'s {}</p>'.format(relative_qualifier, query.name.lower())
-        return '<p>OK, {}.</p>'.format(query.name.lower())
-    return ''
+def _titleify(word:str) -> str:
+    return word[0].upper() + word[1:]
 
 
-def _wod_ssml(wod: wods.WOD, query_type: QueryType) -> str:
-    if query_type == QueryType.CONDITIONING:
-        return wod.conditioning_ssml()
-    elif query_type == QueryType.STRENGTH:
-        return wod.strength_ssml()
-    return wod.full_ssml()
+class RelativeTo(Enum):
+    TODAY = (timedelta(), 'today')
+    YESTERDAY = (timedelta(days=-1), 'yesterday')
+    TOMORROW = (timedelta(days=1), 'tomorrow')
+
+    def __init__(self, day_offset: timedelta, spoken_name: str):
+        self.day_offset = day_offset
+        self.spoken_name = spoken_name
+
+    @property
+    def title_name(self) -> str:
+        return _titleify(self.spoken_name)
 
 
-def _wod_card(wod: wods.WOD, query_type: QueryType) -> speechlet.SimpleCard:
-    card_title = '{} for {}'.format(query_type.pname, _get_speech_date(wod.date))
-    if query_type == QueryType.STRENGTH:
-        card_content = wod.strength_pprint()
-    elif query_type == QueryType.CONDITIONING:
-        card_content = wod.conditioning_pprint()
-    else:
-        card_content = wod.pprint()
-    if wod.image and query_type == QueryType.WORKOUT: # full workout w/ announcement, show pic
-        return speechlet.StandardCard(title=card_title, content=card_content, large_image_url=wod.image)
-    return speechlet.SimpleCard(title=card_title, content=card_content)
+class EBCFSection(Enum):
+    FULL = ('workout', {'workout', 'wod', 'wad'})
+    STRENGTH = ('strength', {'strength', 'lifting'})
+    CONDITIONING = ('conditioning', {'conditioning', 'metcon', 'cardio'})
+
+    def __init__(self, default_spoken_word: str, synonyms: Set[str]):
+        self.default_spoken_word = default_spoken_word
+        self.synonyms = synonyms
 
 
-def goodbye(intent: dict, attributes: dict) -> speechlet.SpeechletResponse:
-    return end_session()
+TEMPLATE_NO_THING = 'There {iswas} no {thing} {relative_to} {date}.'
+TEMPLATE_FOUND = '<p>The {thing} for {relative_to}, {date}</p>{content}'
+CARD_TITLE_TEMPLATE = '{thing} for {relative_to}, {date}'
 
 
-def end_session() -> speechlet.SpeechletResponse:
+def wod_query(relative_to: RelativeTo=RelativeTo.TODAY,
+              ebcf_slot_word: Optional[str]=None,
+              ebcf_section: EBCFSection=EBCFSection.FULL) -> speechlet.SpeechletResponse:
+    wod_query_date = env.localnow()
+    if relative_to != RelativeTo.TODAY:
+        wod_query_date += relative_to.day_offset
+    thing = ebcf_slot_word or ebcf_section.default_spoken_word
+    speech_date = _get_speech_date(wod_query_date)
+    wod = wods.get_wod(wod_query_date.date())
+    card_cls = speechlet.SimpleCard
+    if wod:
+        if ebcf_section == EBCFSection.FULL:
+            ssml_txt = wod.full_ssml()
+            card_content = wod.pprint()
+            if wod.image:
+                card_cls = lambda title, content: speechlet.StandardCard(title, content, wod.image)
+        elif ebcf_section == EBCFSection.STRENGTH:
+            ssml_txt = wod.strength_ssml()
+            card_content = wod.strength_pprint()
+        elif ebcf_section == EBCFSection.CONDITIONING:
+            ssml_txt = wod.conditioning_ssml()
+            card_content = wod.conditioning_pprint()
+        else:
+            assert False, 'Unknown EBCF section'
+        if ssml_txt:
+            return speechlet.SpeechletResponse(
+                output_speech=speechlet.SSML(
+                    TEMPLATE_FOUND.format(
+                        thing=thing,
+                        relative_to=relative_to.spoken_name,
+                        date=speech_date,
+                        content=ssml_txt
+                    )
+                ),
+                card=card_cls(
+                    title=CARD_TITLE_TEMPLATE.format(
+                        thing=_titleify(thing),
+                        relative_to=relative_to.title_name,
+                        date=speech_date
+                    ),
+                    content=card_content
+                ),
+                should_end=True
+            )
+    iswas = 'is' if relative_to != RelativeTo.YESTERDAY else 'was'
     return speechlet.SpeechletResponse(
-        speechlet.PlainText('Goodbye.'),
+        output_speech=speechlet.PlainText(TEMPLATE_NO_THING.format(
+            iswas=iswas,
+            thing=thing,
+            relative_to=relative_to.spoken_name,
+            date=speech_date)
+        ),
         should_end=True
     )
 
 
-def query_intent(intent: dict, attributes: dict) -> speechlet.SpeechletResponse:
+def _get_relative_to_slot(slot: Slot) -> RelativeTo:
+    if slot.has_value and slot.value:
+        test_val = slot.value.lower()
+        for rel in RelativeTo:
+            if test_val.startswith(rel.spoken_name):
+                return rel
+    return RelativeTo.TODAY
+
+
+def _get_ebcf_section_slot(slot: Slot) -> Tuple[EBCFSection, Optional[str]]:
+    if slot.has_value and slot.value:
+        test_val = slot.value.lower()
+        for ebcfsec in EBCFSection:
+            if test_val in ebcfsec.synonyms:
+                return ebcfsec, test_val
+            for syn in ebcfsec.synonyms:
+                if test_val.startswith(syn):
+                    return ebcfsec, syn
+    return EBCFSection.FULL, None
+
+
+def query_intent(intent: Intent) -> speechlet.SpeechletResponse:
     """
     Responds to most queries of the skill.
-    :param intent:
-    :param attributes:
-    :return:
     """
-    try:
-        relative_qualifier = intent['slots']['RelativeQualifier']['value']
-    except KeyError:
-        try:
-            relative_qualifier = attributes['RelativeQualifier']
-        except KeyError:
-            relative_qualifier = None
-    try:
-        query_type = intent['slots']['Query']['value']
-    except KeyError:
-        try:
-            query_type = attributes['Query']
-        except KeyError:
-            query_type = None
-    target_date = env.localdate()
-    if query_type:
-        if 'strength' in query_type.lower():
-            qt = QueryType.STRENGTH
-        elif 'condition' in query_type.lower():
-            qt = QueryType.CONDITIONING
-        else:
-            qt = QueryType.WORKOUT
-        ssml_txt = '<speak>' + _confirm_choice(attributes.get('confirm_choice', False), relative_qualifier, qt)
-        wod = wods.get_wod(target_date)
-        if wod:
-            if wod.publish_datetime < env.now():
-                ssml_txt += _wod_ssml(wod, qt)
-                card = _wod_card(wod, qt)
-            else:
-                ssml_txt += '<p>The wod for {} has not been posted yet.</p>'.format(_get_speech_date(wod.date))
-                card = speechlet.SimpleCard(
-                    title='{} for {}'.format(qt.pname, _get_speech_date(wod.date)),
-                    content='Not posted yet.'
-                )
-        else:
-            ssml_txt += '<p>No workout was found for {}</p>'.format(_get_speech_date(target_date))
-            card = speechlet.SimpleCard(
-                title='{} for {}'.format(qt.pname, _get_speech_date(target_date)),
-                content='Not found.'
-            )
-        return speechlet.SpeechletResponse(
-            speechlet.SSML(ssml_txt + '</speak>'),
-            card=card,
-            should_end=True
-        )
-    else:
-        ssml_txt = 'You can say workout, strength, or conditioning. Which do you want?'
-        if relative_qualifier:
-            ssml_txt = 'I\'m not sure what you want for {}. '.format(relative_qualifier) + ssml_txt
-        return speechlet.SpeechletResponse(
-            speechlet.SSML(ssml_txt),
-            should_end=False,
-            attributes={
-                'RelativeQualifier': relative_qualifier
-            }
-        )
+    relative_to = _get_relative_to_slot(intent.slots[RELATIVE_SLOT])
+    ebcf_section, word_used = _get_ebcf_section_slot(intent.slots[REQUEST_SLOT])
+    return wod_query(relative_to, word_used, ebcf_section)
 
 
-def help_intent(intent: dict, attributes: dict) -> speechlet.SpeechletResponse:
+HELP_SSML = (
+    '<speak>'
+    '<s>Ok, Help.</s>'
+    # Init options
+    '<p>First, you can ask me for the workout, strength, or conditioning.</p>'
+
+    # Yesterday/Tomorrow
+    '<p>You can also add words like: "yesterday", or, "tomorrow". '
+    '<s>For example, ask me for yesterday’s workout or tomorrow’s conditioning.</s></p>'
+
+    # Quit
+    '<p>Finally, you can say: "exit", to quit.</p>'
+
+    # Prompt
+    '<s>What will it be?</s>'
+    '</speak>')
+
+
+def help_intent(intent: Intent) -> speechlet.SpeechletResponse:
     """
     This is triggered when the user asks for "help".
 
@@ -144,117 +170,61 @@ def help_intent(intent: dict, attributes: dict) -> speechlet.SpeechletResponse:
     :param attributes:
     :return:
     """
-    ssml = speechlet.SSML(
-        '<speak>'
-        '<s>Ok, Help.</s>'
-        # Init options
-        '<p>First, you can ask me for the workout, strength, or conditioning.</p>'
-        
-        # Yesterday/Tomorrow
-        '<p>You can also add words like yesterday or tomorrow. '
-        '<s>For example, ask me for yesterday’s workout or tomorrow’s conditioning.</s></p>'
-
-        # DOW
-        '<p>You can also include a day of the week. '
-        '<s>For example, ask me for monday’s workout, or friday’s strength.</s></p>'
-
-        # Quit
-        '<p>Finally, you can say nevermind to quit.</p>'
-
-        # Prompt
-        '<s>What will it be?</s>'
-        '</speak>'
-    )
+    ssml = speechlet.SSML(HELP_SSML)
     card = speechlet.SimpleCard(
         title='Help',
         content=dedent(
             '''
             Example Phrases:
             
-            "workout", "strength", "conditioning", "yesterday's workout", "tomorrow's conditioning",
-            "monday's workout", "friday's strength", "nevermind".
+            "workout", "strength", "conditioning", "yesterday's workout", "tomorrow's conditioning".
             '''
         )
     )
     return speechlet.SpeechletResponse(
         ssml,
         card=card,
-        should_end=False,
-        attributes={
-            'confirm_choice': True
-        }
+        should_end=False
     )
 
 
-def welcome_msg() -> speechlet.SpeechletResponse:
-    """
-    This is the basic welcome message when the user asks Alexa "Open Elliott Bay Crossfit".
-    :return:
-    """
-
-    ssml = speechlet.SSML(
-        '<speak>'
-        '<s>Elliott Bay Crossfit.</s>'
-        '<s>You can ask me for the workout, strength, or conditioning.</s>'
-        '<s>You can also ask for help.</s>'
-        '<s>Which will it be?</s>'
-        '</speak>'
-    )
+def cancel_intent(intent: Intent) -> speechlet.SpeechletResponse:
     return speechlet.SpeechletResponse(
-        ssml,
-        card=speechlet.SimpleCard(
-            title='Elliott Bay Crossfit',
-            content='You can ask me for the "workout", "strength", or "conditioning".'
-            ' You can also ask for "help". Which will it be?'
-        ),
-        should_end=False,
-        attributes={
-            'confirm_choice': True
-        }
+        speechlet.PlainText('Goodbye.'),
+        should_end=True
     )
 
 
-def on_launch(request: dict, session: dict) -> speechlet.SpeechletResponse:
-    LOG.debug('LAUNCH_REQUEST request_id=%s session_id=%s', request['requestId'], session['sessionId'])
-    return welcome_msg()
-
-
-INTENT_MODEL = {
-    'QueryIntent': {
-        'default': query_intent,
-    },
-    'AMAZON.HelpIntent': {
-        'default': help_intent,
-    },
-    'AMAZON.CancelIntent': {
-        'default': goodbye
-    },
-    'AMAZON.StopIntent': {
-        'default': goodbye
-    }
+_INTENTS = {
+    DEFAULT_QUERY_INTENT: query_intent,
+    'AMAZON.HelpIntent': help_intent,
+    'AMAZON.CancelIntent': cancel_intent,
+    'AMAZON.StopIntent': cancel_intent
 }
 
 
-def on_intent(request: dict, session: dict) -> speechlet.SpeechletResponse:
-    intent = request['intent']
-    intent_name = request['intent']['name']
-    LOG.debug('INTENT_REQUEST intent_name: %s request_id=%s session_id=%s',
-              intent_name, request['requestId'], session['sessionId'])
-    attributes = session.get('attributes', {})
-    state = attributes.get('state', 'default')
-    intent_handlers = INTENT_MODEL[intent_name]
-    if state in intent_handlers:
-        return intent_handlers[state](intent, attributes)
-    return intent_handlers['default'](intent, attributes)
+def on_intent_request(event: LambdaEvent) -> speechlet.SpeechletResponse:
+    return _INTENTS[event.request.intent.name](event.request.intent)
 
 
-def on_session_end(request: dict, session: dict) -> speechlet.SpeechletResponse:
-    LOG.debug('SESSION_ENDED_REQUEST request_id=%s session_id=%s', request['requestId'], session['sessionId'])
-    return end_session()
+def on_launch_request(event: LambdaEvent) -> speechlet.SpeechletResponse:
+    return wod_query()
 
 
-REQUEST_HANDLERS = {
-    'LaunchRequest': on_launch,
-    'IntentRequest': on_intent,
-    'SessionEndedRequest': on_session_end
-}
+def on_session_end_request(event: LambdaEvent) -> speechlet.SpeechletResponse:
+    return speechlet.SpeechletResponse(should_end=True)
+
+
+class UnsupportedEventType(Exception):
+    """raised when an unsupported event type comes in"""
+
+
+def handle_event(event: LambdaEvent) -> speechlet.SpeechletResponse:
+    request_type = event.request.type
+    if request_type == RequestTypes.LaunchRequest:
+        return on_launch_request(event)
+    elif request_type == RequestTypes.IntentRequest:
+        return on_intent_request(event)
+    elif request_type == RequestTypes.SessionEndedRequest:
+        return on_session_end_request(event)
+    raise UnsupportedEventType(event)
