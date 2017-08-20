@@ -130,7 +130,7 @@ class _AlexaLaunchRequest(_BaseAlexaRequest):
         self.type = RequestTypes.LaunchRequest
 
 
-class _Slot(object):
+class Slot(object):
     name: str
     has_value: bool
     value: Optional[str]
@@ -151,10 +151,10 @@ class _Slot(object):
         return self.value
 
 
-class _Intent(object):
+class Intent(object):
     name: str
 
-    slots: Optional[Dict[str, _Slot]] = None
+    slots: Optional[Dict[str, Slot]] = None
     """
     A map of key-value pairs that further describes what the user meant based on a predefined intent schema.
     The map can be empty.
@@ -164,7 +164,7 @@ class _Intent(object):
         self.name = i['name']
         if 'slots' in i:
             self.slots = {
-                k: _Slot(v)
+                k: Slot(v)
                 for k, v in i['slots'].items()
             }
 
@@ -183,13 +183,13 @@ class _Intent(object):
 class _AlexaIntentRequest(_BaseAlexaRequest):
     """An IntentRequest is an object that represents a request made to a skill based on what the user wants to do."""
 
-    intent: _Intent
+    intent: Intent
     """An object that represents what the user wants"""
 
     def __init__(self, r: dict):
         super().__init__(r)
         self.type = RequestTypes.IntentRequest
-        self.intent = _Intent(r['intent'])
+        self.intent = Intent(r['intent'])
 
     def __repr__(self):
         return '<{} type={} intent={}>'.format(self.__class__.__name__, self.type, self.intent)
