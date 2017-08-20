@@ -115,6 +115,7 @@ def wod_query(relative_to: RelativeTo=RelativeTo.TODAY,
 
 
 def _get_relative_to_slot(slot: Slot) -> RelativeTo:
+    LOG.debug('RelativeTo: %r', slot)
     if slot.has_value and slot.value:
         test_val = slot.value.lower()
         for rel in RelativeTo:
@@ -124,6 +125,7 @@ def _get_relative_to_slot(slot: Slot) -> RelativeTo:
 
 
 def _get_ebcf_section_slot(slot: Slot) -> Tuple[EBCFSection, Optional[str]]:
+    LOG.debug('RequestType: %r', slot)
     if slot.has_value and slot.value:
         test_val = slot.value.lower()
         for ebcfsec in EBCFSection:
