@@ -53,6 +53,7 @@ def test_intent_request():
     assert req.request.intent.name == 'DefaultQuery'
     assert req.request.intent.slots['RelativeTo'].name == 'RelativeTo'
     assert not req.request.intent.slots['RelativeTo'].has_value
+    assert repr(req.request.intent.slots['RelativeTo']) # test that this returns a non-empty string...
     assert not req.session.new
 
 

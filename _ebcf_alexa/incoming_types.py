@@ -141,7 +141,7 @@ class Slot(object):
         self.value = s.get('value')
 
     def __repr__(self):
-        '<{} {}={}>'.format(self.__class__.__name__, self.name, self.value)
+        return '<{} {}={}>'.format(self.__class__.__name__, self.name, self.value)
 
     def __str__(self):
         if not self.value:
