@@ -5,7 +5,7 @@ import logging
 from datetime import datetime, date as Date
 import sys
 import re
-from typing import List, Iterator, Tuple
+from typing import List, Iterator, Tuple, Optional
 from . import env
 
 LOG = logging.getLogger(__name__)
@@ -29,7 +29,7 @@ def _is_announcement_line(line: str) -> bool:
     return bool(line) and (line.upper() == line or line.endswith('!!'))
 
 
-def _split_announcement_and_strength(strength_raw: str) -> Tuple[List[str], List[str]]:
+def _split_announcement_and_strength(strength_raw: Optional[str]) -> Tuple[List[str], List[str]]:
     """
     Split the strength section into 2 sections: announcements and the actual
     strength training workout.
@@ -41,6 +41,8 @@ def _split_announcement_and_strength(strength_raw: str) -> Tuple[List[str], List
     :param strength_raw: The raw strength text from the API
     :return: 2-tuple with the strength and announcements split by line
     """
+    if strength_raw is None:
+        return [], []
     strength_raw = strength_raw.strip()
     if not strength_raw:
         return [], []

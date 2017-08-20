@@ -162,11 +162,13 @@ NO_ANNOUNCEMENT_EXPECTED = (
         (SPLIT_ANNOUNCEMENT, SPLIT_ANNOUNCEMENT_EXPECTED),
         (NO_ANNOUNCEMENT, NO_ANNOUNCEMENT_EXPECTED),
         ('', ([], [])),  # EMPTY_STRENGTH
+        (None, ([], [])), # NONE STRENGTH
         ('\n \n', ([], []))  # EMPTY_STRENGTH_WITH_NEWLINES
     ],
     ids=['DOUBLE_ANNOUNCEMENT', 'CONCATENATED_ANNOUNCEMENT',
          'SPLIT_ANNOUNCEMENT', 'NO_ANNOUNCEMENT',
-         'EMPTY_STRENGTH', 'EMPTY_STRENGTH_WITH_NEWLINES']
+         'EMPTY_STRENGTH', 'NONE_STRENGTH',
+         'EMPTY_STRENGTH_WITH_NEWLINES']
 )
 def test_split_announcement_and_strength(input_: str, expected: tuple):
     assert wods._split_announcement_and_strength(input_) == expected
