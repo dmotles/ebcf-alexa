@@ -24,3 +24,17 @@ def lambda_handler(event_dict: dict, context) -> dict:
 
     return interaction_model.handle_event(event).dict()
 
+
+if __name__ == '__main__':
+    logging.basicConfig(format='%(levelname)s %(filename)s-%(funcName)s-%(lineno)d: %(message)s', level=logging.DEBUG)
+    import json
+    import sys
+    import pprint
+    import pdb
+    import traceback
+    try:
+        pprint.pprint(lambda_handler(json.load(sys.stdin), None))
+    except Exception:
+        traceback.print_exc()
+        pdb.post_mortem()
+        raise
