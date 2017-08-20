@@ -46,7 +46,7 @@ class RelativeTo(Enum):
 class EBCFSection(Enum):
     FULL = ('workout', {'workout', 'wod', 'wad'})
     STRENGTH = ('strength', {'strength', 'lifting'})
-    CONDITIONING = ('conditioning', {'conditioning', 'metcon', 'cardio'})
+    CONDITIONING = ('conditioning', {'conditioning', 'metcon', 'cardio', 'endurance'})
 
     def __init__(self, default_spoken_word: str, synonyms: Set[str]):
         self.default_spoken_word = default_spoken_word
