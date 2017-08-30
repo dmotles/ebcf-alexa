@@ -1,14 +1,48 @@
 from typing import Union
+import xml.etree.ElementTree as libxml
 
 class _Dictable(object):
     def dict(self) -> dict:
         return {}
 
+
+class SSMLParseError(ValueError):
+    """Raised if ssml is broken."""
+
+
+def xml_error(parse_err: libxml.ParseError, txt: str) -> SSMLParseError:
+    line_no, offset = parse_err.position
+    default_msg = parse_err.args[0]
+    for line in txt.splitlines(False):
+        line_no -= 1
+        if line_no == 0:
+            msg = '\n'.join([
+                default_msg,
+                '',
+                '\t' + line,
+                '\t' + ' '*offset + '^',
+                ])
+            return SSMLParseError(msg)
+    return SSMLParseError(default_msg)
+
+
+def validate_ssml(ssml_str: str):
+    try:
+        doc: libxml.Element = libxml.fromstring(ssml_str)
+    except libxml.ParseError as perr:
+        raise xml_error(perr, ssml_str) from None
+
+    if doc.tag != 'speak':
+        raise SSMLParseError('ssml must start and end with <speak> tags.')
+
+
 class SSML(_Dictable):
     def __init__(self, ssml: str):
         starttag = '<speak>' if not ssml.startswith('<speak>') else ''
         endtag = '</speak>' if not ssml.endswith('</speak>') else ''
-        self.ssml = ''.join((starttag, ssml, endtag))
+        ssml = ''.join((starttag, ssml, endtag))
+        validate_ssml(ssml)
+        self.ssml = ssml
 
     def dict(self) -> dict:
         return {
