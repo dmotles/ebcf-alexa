@@ -234,7 +234,7 @@ _ALIASES = {
     r'HSPU': r'hand stand push ups',
     r'#': r'<sub alias="pounds">#</sub>',
     r'(\d+)"': r'\1<sub alias="inches">"</sub>',
-    r'\'': '<sub alias="feet">\'</sub>',
+    r'(\d+)\'': r'\1<sub alias="feet">\'</sub>',
     r'&': 'and',
     r'(\d+) [Ss]ec\.? ': r'\1 second '
 }

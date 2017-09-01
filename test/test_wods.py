@@ -172,3 +172,13 @@ NO_ANNOUNCEMENT_EXPECTED = (
 )
 def test_split_announcement_and_strength(input_: str, expected: tuple):
     assert wods._split_announcement_and_strength(input_) == expected
+
+
+MASSAGE_FOR_TTS_TESTS = [
+    ('don\'t', 'don\'t'),
+]
+
+
+@pytest.mark.parametrize('_input,expected', MASSAGE_FOR_TTS_TESTS)
+def test__massage_for_TTS(_input, expected):
+    assert wods._massage_for_tts(_input) == expected
