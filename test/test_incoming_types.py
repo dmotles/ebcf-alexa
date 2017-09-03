@@ -112,4 +112,41 @@ VALID_CANCEL_INTENT_EVENT = {
 def test_cancel_intent():
     req = incoming_types.LambdaEvent(VALID_CANCEL_INTENT_EVENT)
     assert req.request.intent.name == 'AMAZON.CancelIntent'
-    str(req.request) # does not crash
+    str(req.request)  # does not crash
+
+
+# This is what the request used to look like when I started making skills.
+# I think I should be backwards compatible..
+OLD_CODE_REQUEST = {
+    "session": {
+        "sessionId": "SessionId.dff1b708-2aeb-4d08-8fa8-aaf549836707",
+        "application": {
+            "applicationId": "amzn1.ask.skill.d6f2f7c4-7689-410d-9c35-8f8baae37969"
+        },
+        "attributes": {},
+        "user": {
+            "userId": "amzn1.ask.account.AGF7EUF4RNORLHSZDNU7KR7W75A2GRGQPT6OMHLBACZBLFKZTA2SPNW2UR527IFJRSPTPMMG5F2J64FH67DWLVUYNRDO5IOLQ2OSS22UJAMPG7YLDFDFSMMVQKWUIIIX5PI3RBDV4YGFZN6M5LR2GV52NQND5PJPVHVE3NAYGSGPLNNPDI6PYTKNAQMBJW2KLONN2Z7F77FUZPA"
+        },
+        "new": True
+    },
+    "request": {
+        "type": "IntentRequest",
+        "requestId": "EdwRequestId.64cef551-0040-4b50-967c-5a2698067cc2",
+        "locale": "en-US",
+        "timestamp": "2017-06-03T23:27:15Z",
+        "intent": {
+            "name": "GetWOD",
+            "slots": {
+                "Date": {
+                    "name": "Date",
+                    "value": "2017-06-02"
+                }
+            }
+        }
+    },
+    "version": "1.0"
+}
+
+def test_old_request():
+    req = incoming_types.LambdaEvent(OLD_CODE_REQUEST)
+    assert req.request.intent.name == 'GetWOD'

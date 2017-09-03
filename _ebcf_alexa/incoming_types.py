@@ -282,7 +282,7 @@ class LambdaEvent(object):
     session: Optional[_RequestSession] = None
     """The session object provides additional context associated with the request."""
 
-    context: _RequestContext
+    context: Optional[_RequestContext] = None
     """
     The context object provides your skill with information about the current state of the Alexa
     service and device at the time the request is sent to your service.
@@ -300,5 +300,6 @@ class LambdaEvent(object):
         assert self.version == SUPPORTED_SCHEMA_VERSION
         if e['session']:
             self.session = _RequestSession(e['session'])
-        self.context = _RequestContext(e['context'])
+        if 'context' in e:
+            self.context = _RequestContext(e['context'])
         self.request = _build_alexa_request(e['request'])
