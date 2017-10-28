@@ -178,7 +178,7 @@ def help_intent(intent: Intent) -> speechlet.SpeechletResponse:
         content=dedent(
             '''
             Example Phrases:
-            
+
             "workout", "strength", "conditioning", "yesterday's workout", "tomorrow's conditioning".
             '''
         )
@@ -205,8 +205,22 @@ _INTENTS = {
 }
 
 
+class UnkownIntentException(Exception):
+    def __init__(self, intent: Intent):
+        super().__init__()
+        self.intent = intent
+
+    def __str__(self):
+        return str(self.intent)
+
+
 def on_intent_request(event: LambdaEvent) -> speechlet.SpeechletResponse:
-    return _INTENTS[event.request.intent.name](event.request.intent)
+    intent = event.request.intent
+    intent_func = _INTENTS.get(intent.name, None)
+    if not intent_func:
+        LOG.error('UNKNOWN INTENT: %s', intent)
+        raise UnkownIntentException(intent)
+    return intent_func(intent)
 
 
 def on_launch_request(event: LambdaEvent) -> speechlet.SpeechletResponse:

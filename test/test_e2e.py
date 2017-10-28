@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import NonCallableMagicMock, patch, mock_open, Mock
 from _ebcf_alexa import wods, env
+from _ebcf_alexa.interaction_model import UnkownIntentException
 from ebcf_alexa import lambda_handler
 from datetime import datetime
 
@@ -94,7 +95,11 @@ DEPRECATED_CODE_REQUEST = {
     "version": "1.0"
 }
 
-@pytest.mark.xfail(reason='we currently dont handle interaction model changes in code.')
+
 def test_interaction_model_breaking_change():
-    resp = lambda_handler(DEPRECATED_CODE_REQUEST, NonCallableMagicMock('context'))
-    assert_valid_response(resp)
+    # While not ideal, an exception will trigger a cloudwatch alarm which
+    # can aid in debugging rapidly.
+    with pytest.raises(UnkownIntentException) as exc_info:
+        lambda_handler(DEPRECATED_CODE_REQUEST, NonCallableMagicMock('context'))
+    # This is an old intent name that isnt used anymore..
+    assert exc_info.value.intent.name == 'GetWOD'
