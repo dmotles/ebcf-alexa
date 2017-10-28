@@ -55,14 +55,35 @@ EBCF_RESPONSE_WOD_20170901_SSML = '''
 DATE_20170901 = datetime(2017, 9, 1, 12, tzinfo=env.UTC)
 
 
-def test_open_skill():
-    with patch_urlopen(EBCF_RESPONSE_WOD_20170901) as mock_urlopen, \
-             patch.object(env, 'now', return_value=DATE_20170901) as mock_now:
-        resp = lambda_handler(OPEN_SKILL, NonCallableMagicMock(name='context'))
-        assert mock_urlopen.called
-        assert mock_now.called
-        assert_valid_response(resp)
-        assert EBCF_RESPONSE_WOD_20170901_SSML == resp['response']['outputSpeech']['ssml']
+@pytest.yield_fixture
+def mock_urlopen():
+    """Makes urlopen return a response from sept 1st, 2017"""
+    with patch_urlopen(EBCF_RESPONSE_WOD_20170901) as m:
+        yield m
+
+
+@pytest.fixture
+def mock_now():
+    """makes datetime.now return sept 1st, 2017"""
+    with patch.object(env, 'now', return_value=DATE_20170901) as m:
+        yield m
+
+
+def test_open_skill(mock_now, mock_urlopen):
+    resp = lambda_handler(OPEN_SKILL, NonCallableMagicMock(name='context'))
+    assert mock_urlopen.called
+    assert mock_now.called
+    assert_valid_response(resp)
+    assert EBCF_RESPONSE_WOD_20170901_SSML == resp['response']['outputSpeech']['ssml']
+
+
+@pytest.mark.xfail(reason='XXX: dont handle invalid slot values right now.')
+def test_misunderstood_section_intent_slot(mock_now, mock_urlopen):
+    with open('test/samples/bad_section_intent.dict') as f:
+        bad_section_intent_request = eval(f.read())
+    resp = lambda_handler(bad_section_intent_request, NonCallableMagicMock(name='context'))
+    assert_valid_response(resp)
+    assert not mock_urlopen.called # we didn't do an API call
 
 
 DEPRECATED_CODE_REQUEST = {
