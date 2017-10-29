@@ -124,7 +124,8 @@ def _get_relative_to_slot(slot: Slot) -> RelativeTo:
     return RelativeTo.TODAY
 
 
-def _get_ebcf_section_slot(slot: Slot) -> Tuple[EBCFSection, Optional[str]]:
+def _get_ebcf_section_slot(intent: Intent) -> Tuple[EBCFSection, Optional[str]]:
+    slot = intent.slots[REQUEST_SLOT]
     LOG.debug('RequestType: %r', slot)
     if slot.has_value and slot.value:
         test_val = slot.value.lower()
@@ -142,7 +143,7 @@ def query_intent(intent: Intent) -> speechlet.SpeechletResponse:
     Responds to most queries of the skill.
     """
     relative_to = _get_relative_to_slot(intent.slots[RELATIVE_SLOT])
-    ebcf_section, word_used = _get_ebcf_section_slot(intent.slots[REQUEST_SLOT])
+    ebcf_section, word_used = _get_ebcf_section_slot(intent)
     return wod_query(relative_to, word_used, ebcf_section)
 
 
