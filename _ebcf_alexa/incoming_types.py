@@ -153,6 +153,12 @@ class Slot(object):
             return '<NOT_SET>'
         return self.value
 
+    def to_dict(self) -> dict:
+        d = {'name': self.name}
+        if self.has_value:
+            d['value'] = self.value
+        return d
+
 
 class Intent(object):
     name: str
@@ -181,6 +187,15 @@ class Intent(object):
                 '{}={}'.format(slot_name, slot)
                 for slot_name, slot in self.slots.items())
         return '{}({})'.format(self.name, slotstr)
+
+    def to_dict(self) -> dict:
+        d = {'name': self.name}
+        if self.slots:
+            d['slots'] = {
+                k: v.to_dict()
+                for k, v in self.slots.items()
+            }
+        return d
 
 
 class _AlexaIntentRequest(_BaseAlexaRequest):

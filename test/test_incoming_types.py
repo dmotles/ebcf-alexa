@@ -1,4 +1,5 @@
 from _ebcf_alexa import incoming_types
+import pytest
 
 VALID_INTENT_LAMBDA_EVENT = {
   "session": {
@@ -20,6 +21,10 @@ VALID_INTENT_LAMBDA_EVENT = {
       "slots": {
         "RelativeTo": {
           "name": "RelativeTo"
+        },
+        "Section": {
+            "name": "Section",
+            "value": "workout"
         }
       }
     },
@@ -45,9 +50,13 @@ VALID_INTENT_LAMBDA_EVENT = {
   "version": "1.0"
 }
 
+@pytest.fixture
+def valid_intent_lambda_event() -> incoming_types.LambdaEvent:
+    return incoming_types.LambdaEvent(VALID_INTENT_LAMBDA_EVENT)
 
-def test_intent_request():
-    req = incoming_types.LambdaEvent(VALID_INTENT_LAMBDA_EVENT)
+
+def test_intent_request(valid_intent_lambda_event: incoming_types.LambdaEvent):
+    req = valid_intent_lambda_event
     assert req.session.application.application_id == "amzn1.ask.skill.d6f2f7c4-7689-410d-9c35-8f8baae37969"
     assert req.request.type == incoming_types.RequestTypes.IntentRequest
     assert req.request.intent.name == 'DefaultQuery'
@@ -55,6 +64,22 @@ def test_intent_request():
     assert not req.request.intent.slots['RelativeTo'].has_value
     assert repr(req.request.intent.slots['RelativeTo']) # test that this returns a non-empty string...
     assert not req.session.new
+
+
+def test_intent_to_dict(valid_intent_lambda_event):
+    intent = valid_intent_lambda_event.request.intent
+    assert intent.to_dict() == {
+        'name': 'DefaultQuery',
+        'slots': {
+            'RelativeTo': {
+                'name': 'RelativeTo'
+            },
+            'Section': {
+                'name': 'Section',
+                'value': 'workout'
+            }
+        }
+    }
 
 
 VALID_LAUNCH_REQUEST_LAMBDA_EVENT = {
