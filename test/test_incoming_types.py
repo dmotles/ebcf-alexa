@@ -68,6 +68,7 @@ def test_intent_request(valid_intent_lambda_event: incoming_types.LambdaEvent):
 
 def test_intent_to_dict(valid_intent_lambda_event):
     intent = valid_intent_lambda_event.request.intent
+    assert intent.last_intent is None
     assert intent.to_dict() == {
         'name': 'DefaultQuery',
         'slots': {}
@@ -251,5 +252,7 @@ INTENT_WITH_ATTRIBUTES = {
 
 def test_merging():
     req = incoming_types.LambdaEvent(INTENT_WITH_ATTRIBUTES)
+    assert req.request.intent.last_intent is not None
+    assert req.request.intent.last_intent.name == 'DefaultQuery'
     assert req.request.intent.slots['RelativeTo'].value == 'today\'s'
     assert req.request.intent.slots['Section'].value == 'workout'

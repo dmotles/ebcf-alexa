@@ -187,6 +187,12 @@ class Intent(object):
     The map can be empty.
     """
 
+    last_intent: Optional = None
+    """
+    If this isn't the first time this intent has been called this session,
+    the last session will be visible here.
+    """
+
     def __init__(self, i: dict):
         self.name = i['name']
         if 'slots' in i:
@@ -223,6 +229,7 @@ class Intent(object):
         is empty or undefined.
         """
         assert other.name == self.name
+        self.last_intent = other
         for other_slot_name, other_slot in other.slots.items():
             slot = self.slots.get(other_slot_name)
             if not slot:
