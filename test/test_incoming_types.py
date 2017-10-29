@@ -70,10 +70,16 @@ def test_intent_to_dict(valid_intent_lambda_event):
     intent = valid_intent_lambda_event.request.intent
     assert intent.to_dict() == {
         'name': 'DefaultQuery',
+        'slots': {}
+    }
+
+
+def test_intent_slot_to_valid_flag_with_to_dict(valid_intent_lambda_event):
+    intent = valid_intent_lambda_event.request.intent
+    intent.slots['Section'].is_valid = True
+    assert intent.to_dict() == {
+        'name': 'DefaultQuery',
         'slots': {
-            'RelativeTo': {
-                'name': 'RelativeTo'
-            },
             'Section': {
                 'name': 'Section',
                 'value': 'workout'

@@ -151,6 +151,11 @@ class Slot(object):
     has_value: bool
     value: Optional[str]
 
+    is_valid: bool = False
+    """This is a flag that indicates if the slot is valid and should be exported
+    when calling `to_dict` on the `Intent`.
+    """
+
     def __init__(self, s:dict):
         self.name = s['name']
         self.has_value = 'value' in s
@@ -207,6 +212,7 @@ class Intent(object):
             d['slots'] = {
                 k: v.to_dict()
                 for k, v in self.slots.items()
+                if v.is_valid
             }
         return d
 
