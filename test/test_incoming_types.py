@@ -175,3 +175,75 @@ OLD_CODE_REQUEST = {
 def test_old_request():
     req = incoming_types.LambdaEvent(OLD_CODE_REQUEST)
     assert req.request.intent.name == 'GetWOD'
+
+
+INTENT_WITH_ATTRIBUTES = {
+  "session": {
+    "new": False,
+    "sessionId": "SessionId.10809a6f-e431-42f6-8d02-1d71ffab2251",
+    "application": {
+      "applicationId": "amzn1.ask.skill.d6f2f7c4-7689-410d-9c35-8f8baae37969"
+    },
+    "attributes": {
+        "intents": {
+            "DefaultQuery": {
+                "name": "DefaultQuery",
+                "slots": {
+                    "RelativeTo": {
+                        "name": "RelativeTo",
+                        "value": "today's"
+                    },
+                    "Section": {
+                        "name": "Section",
+                        "value": "turd"
+                    }
+                }
+            },
+        }
+    },
+    "user": {
+      "userId": "amzn1.ask.account.XXXXX"
+    }
+  },
+  "request": {
+    "type": "IntentRequest",
+    "requestId": "EdwRequestId.eb6a8e40-8272-4d2b-ad2c-d9b7cc787a67",
+    "intent": {
+      "name": "DefaultQuery",
+      "slots": {
+        "RelativeTo": {
+          "name": "RelativeTo"
+        },
+        "Section": {
+            "name": "Section",
+            "value": "workout"
+        }
+      }
+    },
+    "locale": "en-US",
+    "timestamp": "2017-08-19T19:04:26Z"
+  },
+  "context": {
+    "AudioPlayer": {
+      "playerActivity": "IDLE"
+    },
+    "System": {
+      "application": {
+        "applicationId": "amzn1.ask.skill.d6f2f7c4-7689-410d-9c35-8f8baae37969"
+      },
+      "user": {
+        "userId": "amzn1.ask.account.XXXXX"
+      },
+      "device": {
+        "supportedInterfaces": {}
+      }
+    }
+  },
+  "version": "1.0"
+}
+
+
+def test_merging():
+    req = incoming_types.LambdaEvent(INTENT_WITH_ATTRIBUTES)
+    assert req.request.intent.slots['RelativeTo'].value == 'today\'s'
+    assert req.request.intent.slots['Section'].value == 'workout'

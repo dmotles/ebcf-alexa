@@ -210,6 +210,85 @@ class Intent(object):
             }
         return d
 
+    def merge_intent(self, other) -> None:
+        """
+        Hydrates this intent's slot values from a previous intent
+        invocation of the same name. Only re-hydrates if this intent's slot
+        is empty or undefined.
+        """
+        assert other.name == self.name
+        for other_slot_name, other_slot in other.slots.items():
+            slot = self.slots.get(other_slot_name)
+            if not slot:
+                LOG.debug('Appending %r to %r from attributes.',
+                          other_slot, self)
+                self.slots[other_slot_name] = other_slot
+            else:
+                if not slot.has_value or not slot.value:
+                    LOG.debug('Overriding %r with %s in %r from attributes',
+                            slot, other_slot.value, self)
+                    slot.value = other_slot.value
+                else:
+                    LOG.info('ignoring existing %r from attributes!', other_slot)
+
+
+class _SessionAttributes(object):
+    """
+    Attributes are just a map that we can put data into. We use it to carry
+    info between lambda function invocations when we need to reprompt for a
+    mis-understood intent slot.
+    """
+
+    intents: Dict[str, Intent]
+    """
+    A mapping of intent names to the intent data from the last time the
+    intent was invoked in the same session. Used to know what slot values
+    have been filled already when re-prompting for incomplete or incorrect
+    slot values.
+    """
+
+    def __init__(self, a: dict):
+        self.intents = {
+            k: Intent(v)
+            for k, v in a.get('intents', {}).items()
+        }
+
+
+class _RequestSession(object):
+    """Standard request types (LaunchRequest, IntentRequest, and SessionEndedRequest) include the session object."""
+
+    new: bool
+    """
+    A boolean value indicating whether this is a new session.
+    Returns true for a new session or false for an existing session.
+    """
+
+    session_id: str
+    """A string that represents a unique identifier per a user’s active session."""
+
+    attributes: _SessionAttributes
+    """A map of key-value pairs. The attributes map is empty for requests where a
+    new session has started with the property new set to true."""
+
+    application: _RequestApplication
+    """An object containing an application ID.
+    This is used to verify that the request was intended for your service.
+
+    This information is also available in the context.System.application property."""
+
+    user: _RequestUser
+    """An object that describes the user making the request."""
+
+    def __init__(self, s: dict):
+        """
+        :param s: session as dictionary
+        """
+        self.new = s['new']
+        self.session_id = s['sessionId']
+        self.attributes = _SessionAttributes(s.get('attributes', {}))
+        self.application = _RequestApplication(s['application'])
+        self.user = _RequestUser(s['user'])
+
 
 class _AlexaIntentRequest(_BaseAlexaRequest):
     """An IntentRequest is an object that represents a request made to a skill based on what the user wants to do."""
@@ -301,6 +380,15 @@ def _build_alexa_request(request: dict) -> _BaseAlexaRequest:
     return req_type.cls_type(request)
 
 
+def _merge_attribute_slot_values(request: _BaseAlexaRequest,
+                                 attributes: _SessionAttributes):
+    if request.type == RequestTypes.IntentRequest and \
+            request.intent.name in attributes.intents:
+        req_intent: Intent = request.intent
+        old_intent: Intent = attributes.intents[req_intent.name]
+        req_intent.merge_intent(old_intent)
+
+
 class LambdaEvent(object):
     """
     All requests include the version, context, and request objects at the top level.
@@ -334,3 +422,5 @@ class LambdaEvent(object):
         if 'context' in e:
             self.context = _RequestContext(e['context'])
         self.request = _build_alexa_request(e['request'])
+        if not self.session.new:
+            _merge_attribute_slot_values(self.request, self.session.attributes)
