@@ -28,6 +28,19 @@ class _RequestUser(object):
         self.user_id = u['userId']
 
 
+class _SessionAttributes(object):
+    """
+    Attributes are just a map that we can put data into. We use it to carry
+    info between lambda function invocations when we need to reprompt for a
+    mis-understood intent slot.
+    """
+
+    def __init__(self, a: dict):
+        self.intents = [
+            Intent(i) for i in a.get('intents', [])
+        ]
+
+
 class _RequestSession(object):
     """Standard request types (LaunchRequest, IntentRequest, and SessionEndedRequest) include the session object."""
 
