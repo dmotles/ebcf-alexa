@@ -124,9 +124,7 @@ def _get_relative_to_slot(slot: Slot) -> RelativeTo:
     return RelativeTo.TODAY
 
 
-def _get_ebcf_section_slot(intent: Intent) -> Tuple[EBCFSection, Optional[str]]:
-    slot = intent.slots[REQUEST_SLOT]
-    LOG.debug('RequestType: %r', slot)
+def _resolve_ebcf_section_slot(slot: Slot) -> Tuple[EBCFSection, Optional[str]]:
     if slot.has_value and slot.value:
         test_val = slot.value.lower()
         for ebcfsec in EBCFSection:
@@ -135,7 +133,28 @@ def _get_ebcf_section_slot(intent: Intent) -> Tuple[EBCFSection, Optional[str]]:
             for syn in ebcfsec.synonyms:
                 if test_val.startswith(syn):
                     return ebcfsec, syn
-    return EBCFSection.FULL, None
+
+
+def _get_ebcf_section_slot(intent: Intent) -> Tuple[EBCFSection, Optional[str]]:
+    slot = intent.slots[REQUEST_SLOT]
+    LOG.debug('RequestType: %r', slot)
+    resolved = _resolve_ebcf_section_slot(slot)
+    if resolved is None and intent.last_intent is not None \
+            and REQUEST_SLOT in intent.last_intent.slots:
+        # Maybe we picked up a new value that was some garbage. Try old value.
+        slot = intent.last_intent.slots[REQUEST_SLOT]
+        LOG.debug('RequestType from last: %r', slot)
+        resolved = _resolve_ebcf_section_slot(slot)
+    if resolved is not None:
+        return resolved
+    raise MissingEBCFSectionSlot(REQUEST_SLOT)
+
+
+class MissingEBCFSectionSlot(Exception):
+    """raised when we don't know what section the user wanted, either
+    because Alexa didn't hear it correctly or the user gave us some BS
+    that we can't process.
+    """
 
 
 def query_intent(intent: Intent) -> speechlet.SpeechletResponse:

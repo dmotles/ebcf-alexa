@@ -241,6 +241,7 @@ class Intent(object):
                     LOG.debug('Overriding %r with %s in %r from attributes',
                             slot, other_slot.value, self)
                     slot.value = other_slot.value
+                    slot.has_value = True
                 else:
                     LOG.info('ignoring existing %r from attributes!', other_slot)
 
