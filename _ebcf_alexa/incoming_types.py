@@ -91,10 +91,10 @@ class _RequestContext(object):
         offset_ms: Optional[int] = None
         activity: str
 
-        def __init__(self, p:dict):
+        def __init__(self, p: dict):
             self.token = p.get('token')
             self.offset_ms = p.get('offsetInMilliseconds')
-            self.activity = p['playerActivity']
+            self.activity = p.get('playerActivity')
 
     system: _RequestContextSystem
     audio_player: AudioPlayer
