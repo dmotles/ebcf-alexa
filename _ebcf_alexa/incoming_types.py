@@ -21,7 +21,7 @@ class _RequestUser(object):
     user_id: str
     """
     A string that represents a unique identifier for the user who made the request. The length of this identifier
-    can vary, but is never more than 255 characters. The userId is automatically generated when a user enables the 
+    can vary, but is never more than 255 characters. The userId is automatically generated when a user enables the
     skill in the Alexa app.  Note: Disabling and re-enabling a skill generates a new identifier."""
 
     def __init__(self, u: dict):
@@ -47,7 +47,7 @@ class _RequestSession(object):
     application: _RequestApplication
     """An object containing an application ID.
     This is used to verify that the request was intended for your service.
-    
+
     This information is also available in the context.System.application property."""
 
     user: _RequestUser
@@ -101,7 +101,10 @@ class _RequestContext(object):
 
     def __init__(self, c: dict):
         self.system = _RequestContextSystem(c['System'])
-        self.audio_player = self.AudioPlayer(c['AudioPlayer'])
+
+        # FireTV requests dont seem to have AudioPlayer
+        # But Original Echo and Echo Show Do.
+        self.audio_player = self.AudioPlayer(c.get('AudioPlayer', {}))
 
 
 class _BaseAlexaRequest(object):
@@ -233,10 +236,10 @@ class _AlexaSessionEndedRequest(_BaseAlexaRequest):
     reason: str
     """
     Describes why the session ended. Possible values:
-    
+
     - USER_INITIATED: The user explicitly ended the session.
     - ERROR: An error occurred that caused the session to end.
-    - EXCEEDED_MAX_REPROMPTS: The user either did not respond or responded with an utterance that did not match 
+    - EXCEEDED_MAX_REPROMPTS: The user either did not respond or responded with an utterance that did not match
       any of the intents defined in your voice interface.
     """
 
@@ -286,8 +289,8 @@ class LambdaEvent(object):
     """
     The context object provides your skill with information about the current state of the Alexa
     service and device at the time the request is sent to your service.
-    This is included on all requests. For requests sent in the context of a session 
-    (LaunchRequest and IntentRequest), the context object duplicates the user and 
+    This is included on all requests. For requests sent in the context of a session
+    (LaunchRequest and IntentRequest), the context object duplicates the user and
     application information that is also available in the session."""
 
     request: _BaseAlexaRequest
