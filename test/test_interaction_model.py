@@ -19,7 +19,7 @@ def intent_with_bad_slots():
     })
 
 
-PROMPT_FOR_SLOT_MSG = 'Did you want the workout, strength, or conditioning?'
+PROMPT_FOR_SLOT_MSG = 'Did you want strength, conditioning, or just the workout?'
 
 
 class TestQueryIntent(object):
