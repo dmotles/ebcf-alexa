@@ -120,12 +120,13 @@ def _get_relative_to_slot(slot: Slot) -> RelativeTo:
         test_val = slot.value.lower()
         for rel in RelativeTo:
             if test_val.startswith(rel.spoken_name):
+                slot.is_valid = True
+                slot.value = rel.spoken_name
                 return rel
     return RelativeTo.TODAY
 
 
-def _get_ebcf_section_slot(slot: Slot) -> Tuple[EBCFSection, Optional[str]]:
-    LOG.debug('RequestType: %r', slot)
+def _resolve_ebcf_section_slot(slot: Slot) -> Tuple[EBCFSection, Optional[str]]:
     if slot.has_value and slot.value:
         test_val = slot.value.lower()
         for ebcfsec in EBCFSection:
@@ -134,7 +135,46 @@ def _get_ebcf_section_slot(slot: Slot) -> Tuple[EBCFSection, Optional[str]]:
             for syn in ebcfsec.synonyms:
                 if test_val.startswith(syn):
                     return ebcfsec, syn
-    return EBCFSection.FULL, None
+
+
+def _get_ebcf_section_slot(intent: Intent) -> Tuple[EBCFSection, Optional[str]]:
+    slot = intent.slots[REQUEST_SLOT]
+    LOG.debug('RequestType: %r', slot)
+    resolved = _resolve_ebcf_section_slot(slot)
+    if resolved is None and intent.last_intent is not None \
+            and REQUEST_SLOT in intent.last_intent.slots:
+        # Maybe we picked up a new value that was some garbage. Try old value.
+        slot = intent.last_intent.slots[REQUEST_SLOT]
+        LOG.debug('RequestType from last: %r', slot)
+        resolved = _resolve_ebcf_section_slot(slot)
+    if resolved is not None:
+        return resolved
+    raise MissingEBCFSectionSlot(REQUEST_SLOT)
+
+
+def _prompt_missing_ebcf_section_slot(intent: Intent) -> speechlet.SpeechletResponse:
+    return speechlet.SpeechletResponse(
+        output_speech=speechlet.SSML(
+            'I didn\'t understand what you wanted from '
+            'Elliott Bay CrossFit. Did you want strength, conditioning, or just the workout?'
+        ),
+        should_end=False,
+        attributes={
+            'intents': {
+                intent.name: intent.to_dict()
+            }
+        },
+        reprompt=speechlet.SSML(
+            'Did you want strength, conditioning, or just the workout?'
+        )
+    )
+
+
+class MissingEBCFSectionSlot(Exception):
+    """raised when we don't know what section the user wanted, either
+    because Alexa didn't hear it correctly or the user gave us some BS
+    that we can't process.
+    """
 
 
 def query_intent(intent: Intent) -> speechlet.SpeechletResponse:
@@ -142,7 +182,10 @@ def query_intent(intent: Intent) -> speechlet.SpeechletResponse:
     Responds to most queries of the skill.
     """
     relative_to = _get_relative_to_slot(intent.slots[RELATIVE_SLOT])
-    ebcf_section, word_used = _get_ebcf_section_slot(intent.slots[REQUEST_SLOT])
+    try:
+        ebcf_section, word_used = _get_ebcf_section_slot(intent)
+    except MissingEBCFSectionSlot:
+        return _prompt_missing_ebcf_section_slot(intent)
     return wod_query(relative_to, word_used, ebcf_section)
 
 

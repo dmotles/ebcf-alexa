@@ -28,6 +28,19 @@ class _RequestUser(object):
         self.user_id = u['userId']
 
 
+class _SessionAttributes(object):
+    """
+    Attributes are just a map that we can put data into. We use it to carry
+    info between lambda function invocations when we need to reprompt for a
+    mis-understood intent slot.
+    """
+
+    def __init__(self, a: dict):
+        self.intents = [
+            Intent(i) for i in a.get('intents', [])
+        ]
+
+
 class _RequestSession(object):
     """Standard request types (LaunchRequest, IntentRequest, and SessionEndedRequest) include the session object."""
 
@@ -138,6 +151,11 @@ class Slot(object):
     has_value: bool
     value: Optional[str]
 
+    is_valid: bool = False
+    """This is a flag that indicates if the slot is valid and should be exported
+    when calling `to_dict` on the `Intent`.
+    """
+
     def __init__(self, s:dict):
         self.name = s['name']
         self.has_value = 'value' in s
@@ -153,6 +171,12 @@ class Slot(object):
             return '<NOT_SET>'
         return self.value
 
+    def to_dict(self) -> dict:
+        d = {'name': self.name}
+        if self.has_value:
+            d['value'] = self.value
+        return d
+
 
 class Intent(object):
     name: str
@@ -161,6 +185,12 @@ class Intent(object):
     """
     A map of key-value pairs that further describes what the user meant based on a predefined intent schema.
     The map can be empty.
+    """
+
+    last_intent: Optional = None
+    """
+    If this isn't the first time this intent has been called this session,
+    the last session will be visible here.
     """
 
     def __init__(self, i: dict):
@@ -181,6 +211,97 @@ class Intent(object):
                 '{}={}'.format(slot_name, slot)
                 for slot_name, slot in self.slots.items())
         return '{}({})'.format(self.name, slotstr)
+
+    def to_dict(self) -> dict:
+        d = {'name': self.name}
+        if self.slots:
+            d['slots'] = {
+                k: v.to_dict()
+                for k, v in self.slots.items()
+                if v.is_valid
+            }
+        return d
+
+    def merge_intent(self, other) -> None:
+        """
+        Hydrates this intent's slot values from a previous intent
+        invocation of the same name. Only re-hydrates if this intent's slot
+        is empty or undefined.
+        """
+        assert other.name == self.name
+        self.last_intent = other
+        for other_slot_name, other_slot in other.slots.items():
+            slot = self.slots.get(other_slot_name)
+            if not slot:
+                LOG.debug('Appending %r to %r from attributes.',
+                          other_slot, self)
+                self.slots[other_slot_name] = other_slot
+            else:
+                if not slot.has_value or not slot.value:
+                    LOG.debug('Overriding %r with %s in %r from attributes',
+                            slot, other_slot.value, self)
+                    slot.value = other_slot.value
+                    slot.has_value = True
+                else:
+                    LOG.info('ignoring existing %r from attributes!', other_slot)
+
+
+class _SessionAttributes(object):
+    """
+    Attributes are just a map that we can put data into. We use it to carry
+    info between lambda function invocations when we need to reprompt for a
+    mis-understood intent slot.
+    """
+
+    intents: Dict[str, Intent]
+    """
+    A mapping of intent names to the intent data from the last time the
+    intent was invoked in the same session. Used to know what slot values
+    have been filled already when re-prompting for incomplete or incorrect
+    slot values.
+    """
+
+    def __init__(self, a: dict):
+        self.intents = {
+            k: Intent(v)
+            for k, v in a.get('intents', {}).items()
+        }
+
+
+class _RequestSession(object):
+    """Standard request types (LaunchRequest, IntentRequest, and SessionEndedRequest) include the session object."""
+
+    new: bool
+    """
+    A boolean value indicating whether this is a new session.
+    Returns true for a new session or false for an existing session.
+    """
+
+    session_id: str
+    """A string that represents a unique identifier per a user’s active session."""
+
+    attributes: _SessionAttributes
+    """A map of key-value pairs. The attributes map is empty for requests where a
+    new session has started with the property new set to true."""
+
+    application: _RequestApplication
+    """An object containing an application ID.
+    This is used to verify that the request was intended for your service.
+
+    This information is also available in the context.System.application property."""
+
+    user: _RequestUser
+    """An object that describes the user making the request."""
+
+    def __init__(self, s: dict):
+        """
+        :param s: session as dictionary
+        """
+        self.new = s['new']
+        self.session_id = s['sessionId']
+        self.attributes = _SessionAttributes(s.get('attributes', {}))
+        self.application = _RequestApplication(s['application'])
+        self.user = _RequestUser(s['user'])
 
 
 class _AlexaIntentRequest(_BaseAlexaRequest):
@@ -273,6 +394,15 @@ def _build_alexa_request(request: dict) -> _BaseAlexaRequest:
     return req_type.cls_type(request)
 
 
+def _merge_attribute_slot_values(request: _BaseAlexaRequest,
+                                 attributes: _SessionAttributes):
+    if request.type == RequestTypes.IntentRequest and \
+            request.intent.name in attributes.intents:
+        req_intent: Intent = request.intent
+        old_intent: Intent = attributes.intents[req_intent.name]
+        req_intent.merge_intent(old_intent)
+
+
 class LambdaEvent(object):
     """
     All requests include the version, context, and request objects at the top level.
@@ -306,3 +436,5 @@ class LambdaEvent(object):
         if 'context' in e:
             self.context = _RequestContext(e['context'])
         self.request = _build_alexa_request(e['request'])
+        if not self.session.new:
+            _merge_attribute_slot_values(self.request, self.session.attributes)

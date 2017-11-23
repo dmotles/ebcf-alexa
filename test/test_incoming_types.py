@@ -1,4 +1,5 @@
 from _ebcf_alexa import incoming_types
+import pytest
 
 VALID_INTENT_LAMBDA_EVENT = {
   "session": {
@@ -20,6 +21,10 @@ VALID_INTENT_LAMBDA_EVENT = {
       "slots": {
         "RelativeTo": {
           "name": "RelativeTo"
+        },
+        "Section": {
+            "name": "Section",
+            "value": "workout"
         }
       }
     },
@@ -45,9 +50,13 @@ VALID_INTENT_LAMBDA_EVENT = {
   "version": "1.0"
 }
 
+@pytest.fixture
+def valid_intent_lambda_event() -> incoming_types.LambdaEvent:
+    return incoming_types.LambdaEvent(VALID_INTENT_LAMBDA_EVENT)
 
-def test_intent_request():
-    req = incoming_types.LambdaEvent(VALID_INTENT_LAMBDA_EVENT)
+
+def test_intent_request(valid_intent_lambda_event: incoming_types.LambdaEvent):
+    req = valid_intent_lambda_event
     assert req.session.application.application_id == "amzn1.ask.skill.d6f2f7c4-7689-410d-9c35-8f8baae37969"
     assert req.request.type == incoming_types.RequestTypes.IntentRequest
     assert req.request.intent.name == 'DefaultQuery'
@@ -55,6 +64,29 @@ def test_intent_request():
     assert not req.request.intent.slots['RelativeTo'].has_value
     assert repr(req.request.intent.slots['RelativeTo']) # test that this returns a non-empty string...
     assert not req.session.new
+
+
+def test_intent_to_dict(valid_intent_lambda_event):
+    intent = valid_intent_lambda_event.request.intent
+    assert intent.last_intent is None
+    assert intent.to_dict() == {
+        'name': 'DefaultQuery',
+        'slots': {}
+    }
+
+
+def test_intent_slot_to_valid_flag_with_to_dict(valid_intent_lambda_event):
+    intent = valid_intent_lambda_event.request.intent
+    intent.slots['Section'].is_valid = True
+    assert intent.to_dict() == {
+        'name': 'DefaultQuery',
+        'slots': {
+            'Section': {
+                'name': 'Section',
+                'value': 'workout'
+            }
+        }
+    }
 
 
 VALID_LAUNCH_REQUEST_LAMBDA_EVENT = {
@@ -150,3 +182,77 @@ OLD_CODE_REQUEST = {
 def test_old_request():
     req = incoming_types.LambdaEvent(OLD_CODE_REQUEST)
     assert req.request.intent.name == 'GetWOD'
+
+
+INTENT_WITH_ATTRIBUTES = {
+  "session": {
+    "new": False,
+    "sessionId": "SessionId.10809a6f-e431-42f6-8d02-1d71ffab2251",
+    "application": {
+      "applicationId": "amzn1.ask.skill.d6f2f7c4-7689-410d-9c35-8f8baae37969"
+    },
+    "attributes": {
+        "intents": {
+            "DefaultQuery": {
+                "name": "DefaultQuery",
+                "slots": {
+                    "RelativeTo": {
+                        "name": "RelativeTo",
+                        "value": "today's"
+                    },
+                    "Section": {
+                        "name": "Section",
+                        "value": "turd"
+                    }
+                }
+            },
+        }
+    },
+    "user": {
+      "userId": "amzn1.ask.account.XXXXX"
+    }
+  },
+  "request": {
+    "type": "IntentRequest",
+    "requestId": "EdwRequestId.eb6a8e40-8272-4d2b-ad2c-d9b7cc787a67",
+    "intent": {
+      "name": "DefaultQuery",
+      "slots": {
+        "RelativeTo": {
+          "name": "RelativeTo"
+        },
+        "Section": {
+            "name": "Section",
+            "value": "workout"
+        }
+      }
+    },
+    "locale": "en-US",
+    "timestamp": "2017-08-19T19:04:26Z"
+  },
+  "context": {
+    "AudioPlayer": {
+      "playerActivity": "IDLE"
+    },
+    "System": {
+      "application": {
+        "applicationId": "amzn1.ask.skill.d6f2f7c4-7689-410d-9c35-8f8baae37969"
+      },
+      "user": {
+        "userId": "amzn1.ask.account.XXXXX"
+      },
+      "device": {
+        "supportedInterfaces": {}
+      }
+    }
+  },
+  "version": "1.0"
+}
+
+
+def test_merging():
+    req = incoming_types.LambdaEvent(INTENT_WITH_ATTRIBUTES)
+    assert req.request.intent.last_intent is not None
+    assert req.request.intent.last_intent.name == 'DefaultQuery'
+    assert req.request.intent.slots['RelativeTo'].value == 'today\'s'
+    assert req.request.intent.slots['Section'].value == 'workout'
