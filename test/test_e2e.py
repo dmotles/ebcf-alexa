@@ -77,7 +77,6 @@ def test_open_skill(mock_now, mock_urlopen):
     assert EBCF_RESPONSE_WOD_20170901_SSML == resp['response']['outputSpeech']['ssml']
 
 
-@pytest.mark.xfail(reason='XXX: dont handle invalid slot values right now.')
 def test_misunderstood_section_intent_slot(mock_now, mock_urlopen):
     with open('test/samples/bad_section_intent.dict') as f:
         bad_section_intent_request = eval(f.read())
