@@ -58,15 +58,13 @@ TEMPLATE_FOUND = '<p>The {thing} for {relative_to}, {date}</p>{content}'
 CARD_TITLE_TEMPLATE = '{thing} for {relative_to}, {date}'
 
 
-def wod_query(relative_to: RelativeTo=RelativeTo.TODAY,
-              ebcf_slot_word: Optional[str]=None,
-              ebcf_section: EBCFSection=EBCFSection.FULL) -> speechlet.SpeechletResponse:
-    wod_query_date = env.localnow()
-    if relative_to != RelativeTo.TODAY:
-        wod_query_date += relative_to.day_offset
+def _build_wod_query_response(wod: Optional[wods.WOD],
+                              wod_query_date: datetime,
+                              relative_to: RelativeTo,
+                              ebcf_slot_word: Optional[str],
+                              ebcf_section: EBCFSection) -> speechlet.SpeechletResponse:
     thing = ebcf_slot_word or ebcf_section.default_spoken_word
     speech_date = _get_speech_date(wod_query_date)
-    wod = wods.get_wod(wod_query_date.date())
     card_cls = speechlet.SimpleCard
     if wod:
         if ebcf_section == EBCFSection.FULL:
@@ -111,6 +109,18 @@ def wod_query(relative_to: RelativeTo=RelativeTo.TODAY,
             date=speech_date)
         ),
         should_end=True
+    )
+
+
+def wod_query(relative_to: RelativeTo=RelativeTo.TODAY,
+              ebcf_slot_word: Optional[str]=None,
+              ebcf_section: EBCFSection=EBCFSection.FULL) -> speechlet.SpeechletResponse:
+    wod_query_date = env.localnow()
+    if relative_to != RelativeTo.TODAY:
+        wod_query_date += relative_to.day_offset
+    wod = wods.get_wod(wod_query_date.date())
+    return _build_wod_query_response(
+        wod, wod_query_date, relative_to, ebcf_slot_word, ebcf_section
     )
 
 
