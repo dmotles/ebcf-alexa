@@ -44,7 +44,7 @@ class RelativeTo(Enum):
 
 
 class EBCFSection(Enum):
-    FULL = ('workout', {'workout', 'wod', 'wad'})
+    FULL = ('workout', {'workout', 'wod', 'wad', 'both', 'everything', 'full'})
     STRENGTH = ('strength', {'strength', 'lifting'})
     CONDITIONING = ('conditioning', {'conditioning', 'metcon', 'cardio', 'endurance'})
 
@@ -155,8 +155,8 @@ def _get_ebcf_section_slot(intent: Intent) -> Tuple[EBCFSection, Optional[str]]:
 def _prompt_missing_ebcf_section_slot(intent: Intent) -> speechlet.SpeechletResponse:
     return speechlet.SpeechletResponse(
         output_speech=speechlet.SSML(
-            'I didn\'t understand what you wanted from '
-            'Elliott Bay CrossFit. Did you want strength, conditioning, or just the workout?'
+            'I didn\'t understand what you wanted. '
+            'Did you want strength, conditioning, or both?'
         ),
         should_end=False,
         attributes={
@@ -165,7 +165,7 @@ def _prompt_missing_ebcf_section_slot(intent: Intent) -> speechlet.SpeechletResp
             }
         },
         reprompt=speechlet.SSML(
-            'Did you want strength, conditioning, or just the workout?'
+            'Did you want strength, conditioning, or both?'
         )
     )
 
