@@ -6,7 +6,6 @@ from _ebcf_alexa import env
 from datetime import datetime
 import pytest
 from unittest.mock import patch
-from typing import Optional
 
 
 @pytest.yield_fixture(autouse=True)
