@@ -81,7 +81,7 @@ class TestQueryIntentWithPatchedOutGetWOD(object):
         ('full workout', 'full workout'),
         ('wad', 'wod')
     ])
-    def test_request_type_is_EBCFSection_FULL(self, request_type, expected_thing):
+    def test_request_type_is_RequestTypeSlot_FULL(self, request_type, expected_thing):
         intent = Intent({
             'name': 'DefaultQuery',
             'slots': {
@@ -107,7 +107,7 @@ class TestQueryIntentWithPatchedOutGetWOD(object):
         assert 'conditioning section goes here' in response_ssml
         assert not response.attributes
 
-    def test_request_type_is_EBCFSection_STRENGTH(self):
+    def test_request_type_is_RequestTypeSlot_STRENGTH(self):
         intent = Intent({
             'name': 'DefaultQuery',
             'slots': {
@@ -133,7 +133,7 @@ class TestQueryIntentWithPatchedOutGetWOD(object):
         ('conditioning', 'conditioning'),
         ('metcon', 'metcon')
     ])
-    def test_request_type_is_EBCFSection_CONDITIONING(self, request_type, expected_thing):
+    def test_request_type_is_RequestTypeSlot_CONDITIONING(self, request_type, expected_thing):
         intent = Intent({
             'name': 'DefaultQuery',
             'slots': {

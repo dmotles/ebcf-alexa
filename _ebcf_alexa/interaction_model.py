@@ -43,7 +43,7 @@ class RelativeTo(Enum):
         return _titleify(self.spoken_name)
 
 
-class EBCFSection(Enum):
+class RequestTypeSlot(Enum):
     FULL = ('workout', {
         'workout': 'workout',
         'wod': 'wod',
@@ -75,20 +75,20 @@ def _build_wod_query_response(wod: Optional[wods.WOD],
                               wod_query_date: datetime,
                               relative_to: RelativeTo,
                               ebcf_slot_word: Optional[str],
-                              ebcf_section: EBCFSection) -> speechlet.SpeechletResponse:
-    thing = ebcf_slot_word or ebcf_section.default_spoken_word
+                              request_type_slot: RequestTypeSlot) -> speechlet.SpeechletResponse:
+    thing = ebcf_slot_word or request_type_slot.default_spoken_word
     speech_date = _get_speech_date(wod_query_date)
     card_cls = speechlet.SimpleCard
     if wod:
-        if ebcf_section == EBCFSection.FULL:
+        if request_type_slot == RequestTypeSlot.FULL:
             ssml_txt = wod.full_ssml()
             card_content = wod.pprint()
             if wod.image:
                 card_cls = lambda title, content: speechlet.StandardCard(title, content, wod.image)
-        elif ebcf_section == EBCFSection.STRENGTH:
+        elif request_type_slot == RequestTypeSlot.STRENGTH:
             ssml_txt = wod.strength_ssml()
             card_content = wod.strength_pprint()
-        elif ebcf_section == EBCFSection.CONDITIONING:
+        elif request_type_slot == RequestTypeSlot.CONDITIONING:
             ssml_txt = wod.conditioning_ssml()
             card_content = wod.conditioning_pprint()
         else:
@@ -127,13 +127,13 @@ def _build_wod_query_response(wod: Optional[wods.WOD],
 
 def wod_query(relative_to: RelativeTo=RelativeTo.TODAY,
               ebcf_slot_word: Optional[str]=None,
-              ebcf_section: EBCFSection=EBCFSection.FULL) -> speechlet.SpeechletResponse:
+              request_type_slot: RequestTypeSlot=RequestTypeSlot.FULL) -> speechlet.SpeechletResponse:
     wod_query_date = env.localnow()
     if relative_to != RelativeTo.TODAY:
         wod_query_date += relative_to.day_offset
     wod = wods.get_wod(wod_query_date.date())
     return _build_wod_query_response(
-        wod, wod_query_date, relative_to, ebcf_slot_word, ebcf_section
+        wod, wod_query_date, relative_to, ebcf_slot_word, request_type_slot
     )
 
 
@@ -149,10 +149,10 @@ def _get_relative_to_slot(slot: Slot) -> RelativeTo:
     return RelativeTo.TODAY
 
 
-def _resolve_ebcf_section_slot(slot: Slot) -> Tuple[EBCFSection, Optional[str]]:
+def _resolve_request_type_slot(slot: Slot) -> Tuple[RequestTypeSlot, Optional[str]]:
     if slot.has_value and slot.value:
         test_val = slot.value.lower()
-        for ebcfsec in EBCFSection:
+        for ebcfsec in RequestTypeSlot:
             if test_val in ebcfsec.synonyms:
                 return ebcfsec, ebcfsec.synonyms[test_val]
             for syn in ebcfsec.synonyms:
@@ -160,25 +160,25 @@ def _resolve_ebcf_section_slot(slot: Slot) -> Tuple[EBCFSection, Optional[str]]:
                     return ebcfsec, ebcfsec.synonyms[syn]
 
 
-def _get_ebcf_section_slot(intent: Intent) -> Tuple[EBCFSection, Optional[str]]:
+def _get_request_type_slot(intent: Intent) -> Tuple[RequestTypeSlot, Optional[str]]:
     try:
         slot = intent.slots[REQUEST_SLOT]
     except KeyError:
-        raise MissingEBCFSectionSlot(REQUEST_SLOT)
+        raise MissingSlot(REQUEST_SLOT)
     LOG.debug('RequestType: %r', slot)
-    resolved = _resolve_ebcf_section_slot(slot)
+    resolved = _resolve_request_type_slot(slot)
     if resolved is None and intent.last_intent is not None \
             and REQUEST_SLOT in intent.last_intent.slots:
         # Maybe we picked up a new value that was some garbage. Try old value.
         slot = intent.last_intent.slots[REQUEST_SLOT]
         LOG.debug('RequestType from last: %r', slot)
-        resolved = _resolve_ebcf_section_slot(slot)
+        resolved = _resolve_request_type_slot(slot)
     if resolved is not None:
         return resolved
-    raise MissingEBCFSectionSlot(REQUEST_SLOT)
+    raise MissingSlot(REQUEST_SLOT)
 
 
-def _prompt_missing_ebcf_section_slot(intent: Intent) -> speechlet.SpeechletResponse:
+def _prompt_missing_request_type_slot(intent: Intent) -> speechlet.SpeechletResponse:
     return speechlet.SpeechletResponse(
         output_speech=speechlet.SSML(
             'I didn\'t understand what you wanted. '
@@ -196,7 +196,7 @@ def _prompt_missing_ebcf_section_slot(intent: Intent) -> speechlet.SpeechletResp
     )
 
 
-class MissingEBCFSectionSlot(Exception):
+class MissingSlot(Exception):
     """raised when we don't know what section the user wanted, either
     because Alexa didn't hear it correctly or the user gave us some BS
     that we can't process.
@@ -209,10 +209,10 @@ def query_intent(intent: Intent) -> speechlet.SpeechletResponse:
     """
     relative_to = _get_relative_to_slot(intent.slots[RELATIVE_SLOT])
     try:
-        ebcf_section, word_used = _get_ebcf_section_slot(intent)
-    except MissingEBCFSectionSlot:
-        return _prompt_missing_ebcf_section_slot(intent)
-    return wod_query(relative_to, word_used, ebcf_section)
+        request_type_slot, word_used = _get_request_type_slot(intent)
+    except MissingSlot:
+        return _prompt_missing_request_type_slot(intent)
+    return wod_query(relative_to, word_used, request_type_slot)
 
 
 HELP_SSML = (
