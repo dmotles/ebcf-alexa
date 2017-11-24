@@ -4,7 +4,7 @@ Interaction Model
 This module basically maps out the response tree for the skill.
 """
 from datetime import timedelta, datetime, date
-from typing import Union, Optional, Set, Tuple
+from typing import Union, Optional, Dict, Tuple
 from textwrap import dedent
 from enum import Enum
 import logging
@@ -44,11 +44,24 @@ class RelativeTo(Enum):
 
 
 class EBCFSection(Enum):
-    FULL = ('workout', {'workout', 'wod', 'wad', 'both', 'everything', 'full'})
-    STRENGTH = ('strength', {'strength', 'lifting'})
-    CONDITIONING = ('conditioning', {'conditioning', 'metcon', 'cardio', 'endurance'})
+    FULL = ('workout', {
+        'workout': 'workout',
+        'wod': 'wod',
+        'wad': 'wod',
+        'both': 'full workout',
+        'everything': 'full workout',
+        'full': 'full workout'})
+    STRENGTH = ('strength', {
+        'strength': 'strength',
+        'lifting': 'lifting'
+    })
+    CONDITIONING = ('conditioning', {
+        'conditioning': 'conditioning',
+        'metcon': 'metcon',
+        'cardio': 'cardio',
+        'endurance': 'endurance'})
 
-    def __init__(self, default_spoken_word: str, synonyms: Set[str]):
+    def __init__(self, default_spoken_word: str, synonyms: Dict[str, str]):
         self.default_spoken_word = default_spoken_word
         self.synonyms = synonyms
 
@@ -141,10 +154,10 @@ def _resolve_ebcf_section_slot(slot: Slot) -> Tuple[EBCFSection, Optional[str]]:
         test_val = slot.value.lower()
         for ebcfsec in EBCFSection:
             if test_val in ebcfsec.synonyms:
-                return ebcfsec, test_val
+                return ebcfsec, ebcfsec.synonyms[test_val]
             for syn in ebcfsec.synonyms:
                 if test_val.startswith(syn):
-                    return ebcfsec, syn
+                    return ebcfsec, ebcfsec.synonyms[syn]
 
 
 def _get_ebcf_section_slot(intent: Intent) -> Tuple[EBCFSection, Optional[str]]:

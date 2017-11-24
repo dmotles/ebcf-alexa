@@ -15,36 +15,10 @@ def mock_now():
         yield mocknow
 
 
-@pytest.fixture
-def fakewod(mock_now):
-    return WOD({
-        'strength': 'strength here',
-        'conditioning': 'its hard',
-        'date': '2017-11-20T00:00:00.000Z',
-        'publishDate': '2017-11-20T00:00:00.000Z'
-    })
-
-
-@pytest.fixture(params=['full workout', 'everything', 'both', 'wod', 'wad'])
-def intent_with_synonym(request):
-    return Intent({
-        'name': 'DefaultQuery',
-        'slots': {
-            'RelativeTo': {
-                'name': 'RelativeTo',
-                'value': 'today\'s'
-            },
-            'RequestType': {
-                'name': 'RequestType',
-                'value': request.param
-            }
-        }
-    })
-
 PROMPT_FOR_SLOT_MSG = 'Did you want strength, conditioning, or both?'
 
 
-class TestQueryIntent(object):
+class TestQueryIntentReprompt(object):
     def assert_response_is_reprompt(self,
                                     response: SpeechletResponse,
                                     expected_relative_to: str):
@@ -89,9 +63,98 @@ class TestQueryIntent(object):
         response = im.query_intent(intent)
         self.assert_response_is_reprompt(response, 'today')
 
-    def test_request_type_is_synonym(self, intent_with_synonym, fakewod):
-        with patch('_ebcf_alexa.wods.get_wod', return_value=fakewod):
-            response = im.query_intent(intent_with_synonym)
-            assert 'strength here' in response.output_speech.ssml
-            assert 'its hard' in response.output_speech.ssml
-            assert not response.attributes
+
+class TestQueryIntentWithPatchedOutGetWOD(object):
+    @pytest.yield_fixture(autouse=True)
+    def fakewod(self, mock_now):
+        wod = WOD({
+            'strength': 'strength section goes here',
+            'conditioning': 'conditioning section goes here',
+            'date': '2017-11-20T00:00:00.000Z',
+            'publishDate': '2017-11-20T00:00:00.000Z'
+        })
+        with patch('_ebcf_alexa.wods.get_wod', return_value=wod) as mock:
+            yield mock
+
+    @pytest.mark.parametrize('request_type,expected_thing', [
+        ('workout', 'workout'),
+        ('full workout', 'full workout'),
+        ('wad', 'wod')
+    ])
+    def test_request_type_is_EBCFSection_FULL(self, request_type, expected_thing):
+        intent = Intent({
+            'name': 'DefaultQuery',
+            'slots': {
+                'RelativeTo': {
+                    'name': 'RelativeTo',
+                    'value': 'today\'s'
+                },
+                'RequestType': {
+                    'name': 'RequestType',
+                    'value': request_type
+                }
+            }
+        })
+        response = im.query_intent(intent)
+        expected_opening_sentence = (
+            'The {expected} for today, Monday November 20, 2017'.format(
+                expected=expected_thing
+            )
+        )
+        response_ssml = response.output_speech.ssml
+        assert expected_opening_sentence in response_ssml
+        assert 'strength section goes here' in response_ssml
+        assert 'conditioning section goes here' in response_ssml
+        assert not response.attributes
+
+    def test_request_type_is_EBCFSection_STRENGTH(self):
+        intent = Intent({
+            'name': 'DefaultQuery',
+            'slots': {
+                'RelativeTo': {
+                    'name': 'RelativeTo',
+                    'value': 'today\'s'
+                },
+                'RequestType': {
+                    'name': 'RequestType',
+                    'value': 'strength'
+                }
+            }
+        })
+        response = im.query_intent(intent)
+        response_ssml = response.output_speech.ssml
+        assert 'The strength for today, Monday November 20, 2017' in response_ssml
+        assert 'strength section goes here' in response_ssml
+        assert 'conditioning section goes here' not in response_ssml
+        assert not response.attributes
+
+    @pytest.mark.parametrize('request_type,expected_thing', [
+        ('cardio', 'cardio'),
+        ('conditioning', 'conditioning'),
+        ('metcon', 'metcon')
+    ])
+    def test_request_type_is_EBCFSection_CONDITIONING(self, request_type, expected_thing):
+        intent = Intent({
+            'name': 'DefaultQuery',
+            'slots': {
+                'RelativeTo': {
+                    'name': 'RelativeTo',
+                    'value': 'today\'s'
+                },
+                'RequestType': {
+                    'name': 'RequestType',
+                    'value': request_type
+                }
+            }
+        })
+        response = im.query_intent(intent)
+        response_ssml = response.output_speech.ssml
+        expected_opening_sentence = (
+            'The {expected} for today, Monday November 20, 2017'.format(
+                expected=expected_thing
+            )
+        )
+        assert expected_opening_sentence in response_ssml
+        assert 'strength section goes here' not in response_ssml
+        assert 'conditioning section goes here' in response_ssml
+        assert not response.attributes
