@@ -29,7 +29,7 @@ def _titleify(word:str) -> str:
     return word[0].upper() + word[1:]
 
 
-class RelativeTo(Enum):
+class RelativeToSlot(Enum):
     TODAY = (timedelta(), 'today')
     YESTERDAY = (timedelta(days=-1), 'yesterday')
     TOMORROW = (timedelta(days=1), 'tomorrow')
@@ -73,7 +73,7 @@ CARD_TITLE_TEMPLATE = '{thing} for {relative_to}, {date}'
 
 def _build_wod_query_response(wod: Optional[wods.WOD],
                               wod_query_date: datetime,
-                              relative_to: RelativeTo,
+                              relative_to: RelativeToSlot,
                               ebcf_slot_word: Optional[str],
                               request_type_slot: RequestTypeSlot) -> speechlet.SpeechletResponse:
     thing = ebcf_slot_word or request_type_slot.default_spoken_word
@@ -113,7 +113,7 @@ def _build_wod_query_response(wod: Optional[wods.WOD],
                 ),
                 should_end=True
             )
-    iswas = 'is' if relative_to != RelativeTo.YESTERDAY else 'was'
+    iswas = 'is' if relative_to != RelativeToSlot.YESTERDAY else 'was'
     return speechlet.SpeechletResponse(
         output_speech=speechlet.PlainText(TEMPLATE_NO_THING.format(
             iswas=iswas,
@@ -125,11 +125,11 @@ def _build_wod_query_response(wod: Optional[wods.WOD],
     )
 
 
-def wod_query(relative_to: RelativeTo=RelativeTo.TODAY,
+def wod_query(relative_to: RelativeToSlot=RelativeToSlot.TODAY,
               ebcf_slot_word: Optional[str]=None,
               request_type_slot: RequestTypeSlot=RequestTypeSlot.FULL) -> speechlet.SpeechletResponse:
     wod_query_date = env.localnow()
-    if relative_to != RelativeTo.TODAY:
+    if relative_to != RelativeToSlot.TODAY:
         wod_query_date += relative_to.day_offset
     wod = wods.get_wod(wod_query_date.date())
     return _build_wod_query_response(
@@ -137,16 +137,16 @@ def wod_query(relative_to: RelativeTo=RelativeTo.TODAY,
     )
 
 
-def _get_relative_to_slot(slot: Slot) -> RelativeTo:
+def _get_relative_to_slot(slot: Slot) -> RelativeToSlot:
     LOG.debug('RelativeTo: %r', slot)
     if slot.has_value and slot.value:
         test_val = slot.value.lower()
-        for rel in RelativeTo:
+        for rel in RelativeToSlot:
             if test_val.startswith(rel.spoken_name):
                 slot.is_valid = True
                 slot.value = rel.spoken_name
                 return rel
-    return RelativeTo.TODAY
+    return RelativeToSlot.TODAY
 
 
 def _resolve_request_type_slot(slot: Slot) -> Tuple[RequestTypeSlot, Optional[str]]:
