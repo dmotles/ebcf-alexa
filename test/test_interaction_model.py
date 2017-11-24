@@ -101,7 +101,7 @@ class TestQueryIntentReprompt(object):
         self.assert_response_is_reprompt(response)
         self.assert_relative_to_saved_in_attributes(response, 'today')
 
-    @pytest.mark.xfail
+    @pytest.mark.xfail(reason='Not implemented yet')
     def test_invalid_RelativeTo_slot(self):
         intent = Intent({
             'name': 'DefaultQuery',
@@ -120,23 +120,36 @@ class TestQueryIntentReprompt(object):
         self.assert_response_is_reprompt(response)
         self.assert_request_type_saved_in_attributes(response, 'workout')
 
-    @pytest.mark.xfail
-    def test_missing_RelativeTo_slot(self):
-        intent = Intent({
-            'name': 'DefaultQuery',
-            'slots': {
-                'RequestType': {
-                    'name': 'RequestType',
-                    'value': 'workout'
-                }
-            }
-        })
-        response = im.query_intent(intent)
-        self.assert_response_is_reprompt(response)
-        self.assert_request_type_saved_in_attributes(response, 'workout')
-
-
 class TestQueryIntentWithPatchedOutGetWOD(object):
+    @staticmethod
+    def assert_opening_sentence_correct(response: SpeechletResponse,
+                                        expected_request_type_word: str):
+        expected_opening_sentence = (
+            'The {expected} for today, Monday November 20, 2017'.format(
+                expected=expected_request_type_word
+            )
+        )
+        response_ssml = response.output_speech.ssml
+        assert expected_opening_sentence in response_ssml
+
+    @staticmethod
+    def assert_is_full_workout(response: SpeechletResponse):
+        response_ssml = response.output_speech.ssml
+        assert 'strength section goes here' in response_ssml
+        assert 'conditioning section goes here' in response_ssml
+
+    @staticmethod
+    def assert_strength_only(response: SpeechletResponse):
+        response_ssml = response.output_speech.ssml
+        assert 'strength section goes here' in response_ssml
+        assert 'conditioning section goes here' not in response_ssml
+
+    @staticmethod
+    def assert_conditioning_only(response: SpeechletResponse):
+        response_ssml = response.output_speech.ssml
+        assert 'strength section goes here' not in response_ssml
+        assert 'conditioning section goes here' in response_ssml
+
     @pytest.mark.parametrize('request_type,expected_thing', [
         ('workout', 'workout'),
         ('full workout', 'full workout'),
@@ -157,16 +170,10 @@ class TestQueryIntentWithPatchedOutGetWOD(object):
             }
         })
         response = im.query_intent(intent)
-        expected_opening_sentence = (
-            'The {expected} for today, Monday November 20, 2017'.format(
-                expected=expected_thing
-            )
-        )
-        response_ssml = response.output_speech.ssml
-        assert expected_opening_sentence in response_ssml
-        assert 'strength section goes here' in response_ssml
-        assert 'conditioning section goes here' in response_ssml
+        self.assert_opening_sentence_correct(response, expected_thing)
+        self.assert_is_full_workout(response)
         assert not response.attributes
+        assert response.should_end
 
     def test_request_type_is_RequestTypeSlot_STRENGTH(self):
         intent = Intent({
@@ -183,11 +190,10 @@ class TestQueryIntentWithPatchedOutGetWOD(object):
             }
         })
         response = im.query_intent(intent)
-        response_ssml = response.output_speech.ssml
-        assert 'The strength for today, Monday November 20, 2017' in response_ssml
-        assert 'strength section goes here' in response_ssml
-        assert 'conditioning section goes here' not in response_ssml
+        self.assert_opening_sentence_correct(response, 'strength')
+        self.assert_strength_only(response)
         assert not response.attributes
+        assert response.should_end
 
     @pytest.mark.parametrize('request_type,expected_thing', [
         ('cardio', 'cardio'),
@@ -209,16 +215,10 @@ class TestQueryIntentWithPatchedOutGetWOD(object):
             }
         })
         response = im.query_intent(intent)
-        response_ssml = response.output_speech.ssml
-        expected_opening_sentence = (
-            'The {expected} for today, Monday November 20, 2017'.format(
-                expected=expected_thing
-            )
-        )
-        assert expected_opening_sentence in response_ssml
-        assert 'strength section goes here' not in response_ssml
-        assert 'conditioning section goes here' in response_ssml
+        self.assert_opening_sentence_correct(response, expected_thing)
+        self.assert_conditioning_only(response)
         assert not response.attributes
+        assert response.should_end
 
     def test_empty_RelativeTo_slot(self):
         """Assuming RelativeTo empty means the user intended to get today's workout"""
@@ -235,8 +235,24 @@ class TestQueryIntentWithPatchedOutGetWOD(object):
             }
         })
         response = im.query_intent(intent)
-        response_ssml = response.output_speech.ssml
-        assert 'The workout for today, Monday November 20, 2017' in response_ssml
-        assert 'strength section goes here' in response_ssml
-        assert 'conditioning section goes here' in response_ssml
+        self.assert_opening_sentence_correct(response, 'workout')
+        self.assert_is_full_workout(response)
         assert not response.attributes
+        assert response.should_end
+
+    @pytest.mark.xfail(reason='Not implemented yet')
+    def test_missing_RelativeTo_slot(self):
+        intent = Intent({
+            'name': 'DefaultQuery',
+            'slots': {
+                'RequestType': {
+                    'name': 'RequestType',
+                    'value': 'workout'
+                }
+            }
+        })
+        response = im.query_intent(intent)
+        self.assert_opening_sentence_correct(response, 'workout')
+        self.assert_is_full_workout(response)
+        assert not response.attributes
+        assert response.should_end
