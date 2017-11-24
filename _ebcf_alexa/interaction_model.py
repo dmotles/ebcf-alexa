@@ -138,7 +138,10 @@ def _resolve_ebcf_section_slot(slot: Slot) -> Tuple[EBCFSection, Optional[str]]:
 
 
 def _get_ebcf_section_slot(intent: Intent) -> Tuple[EBCFSection, Optional[str]]:
-    slot = intent.slots[REQUEST_SLOT]
+    try:
+        slot = intent.slots[REQUEST_SLOT]
+    except KeyError:
+        raise MissingEBCFSectionSlot(REQUEST_SLOT)
     LOG.debug('RequestType: %r', slot)
     resolved = _resolve_ebcf_section_slot(slot)
     if resolved is None and intent.last_intent is not None \
