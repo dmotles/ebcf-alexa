@@ -6,32 +6,52 @@ from _ebcf_alexa import env
 from datetime import datetime
 import pytest
 from unittest.mock import patch
+from typing import Optional
 
 
-@pytest.yield_fixture
+@pytest.yield_fixture(autouse=True)
 def mock_now():
     d = datetime(2017, 11, 20, 12, tzinfo=env.UTC)
     with patch.object(env, 'now', return_value=d) as mocknow:
         yield mocknow
 
 
+@pytest.yield_fixture(autouse=True)
+def fakewod(mock_now):
+    wod = WOD({
+        'strength': 'strength section goes here',
+        'conditioning': 'conditioning section goes here',
+        'date': '2017-11-20T00:00:00.000Z',
+        'publishDate': '2017-11-20T00:00:00.000Z'
+    })
+    with patch('_ebcf_alexa.wods.get_wod', return_value=wod) as mock:
+        yield mock
+
+
 PROMPT_FOR_SLOT_MSG = 'Did you want strength, conditioning, or both?'
 
 
 class TestQueryIntentReprompt(object):
-    def assert_response_is_reprompt(self,
-                                    response: SpeechletResponse,
-                                    expected_relative_to: str):
+    @staticmethod
+    def assert_response_is_reprompt(response: SpeechletResponse):
         assert PROMPT_FOR_SLOT_MSG in response.output_speech.ssml
         assert not response.should_end
         assert 'intents' in response.attributes
         intents = response.attributes['intents']
         assert 'DefaultQuery' in intents
-        default_query = intents['DefaultQuery']
-        assert 'RelativeTo' in default_query['slots']
-        relative_to_slot = default_query['slots']['RelativeTo']
-        assert relative_to_slot['value'] == expected_relative_to
         assert PROMPT_FOR_SLOT_MSG in response.reprompt.ssml
+
+    @staticmethod
+    def assert_relative_to_saved_in_attributes(response: SpeechletResponse,
+                                               expected_value: str):
+        relative_to_slot = response.attributes['intents']['DefaultQuery']['slots']['RelativeTo']
+        assert relative_to_slot['value'] == expected_value
+
+    @staticmethod
+    def assert_request_type_saved_in_attributes(response: SpeechletResponse,
+                                                expected_value: str):
+        request_type_slot = response.attributes['intents']['DefaultQuery']['slots']['RequestType']
+        assert request_type_slot['value'] == expected_value
 
     def test_bad_RequestType_slot(self):
         intent = Intent({
@@ -48,7 +68,25 @@ class TestQueryIntentReprompt(object):
             }
         })
         response = im.query_intent(intent)
-        self.assert_response_is_reprompt(response, 'today')
+        self.assert_response_is_reprompt(response)
+        self.assert_relative_to_saved_in_attributes(response, 'today')
+
+    def test_empty_RequestType_slot(self):
+        intent = Intent({
+            'name': 'DefaultQuery',
+            'slots': {
+                'RelativeTo': {
+                    'name': 'RelativeTo',
+                    'value': 'today\'s'
+                },
+                'RequestType': {
+                    'name': 'RequestType'
+                }
+            }
+        })
+        response = im.query_intent(intent)
+        self.assert_response_is_reprompt(response)
+        self.assert_relative_to_saved_in_attributes(response, 'today')
 
     def test_missing_RequestType_slot(self):
         intent = Intent({
@@ -61,21 +99,45 @@ class TestQueryIntentReprompt(object):
             }
         })
         response = im.query_intent(intent)
-        self.assert_response_is_reprompt(response, 'today')
+        self.assert_response_is_reprompt(response)
+        self.assert_relative_to_saved_in_attributes(response, 'today')
+
+    @pytest.mark.xfail
+    def test_invalid_RelativeTo_slot(self):
+        intent = Intent({
+            'name': 'DefaultQuery',
+            'slots': {
+                'RelativeTo': {
+                    'name': 'RelativeTo',
+                    'value': 'year\'s'
+                },
+                'RequestType': {
+                    'name': 'RequestType',
+                    'value': 'workout'
+                }
+            }
+        })
+        response = im.query_intent(intent)
+        self.assert_response_is_reprompt(response)
+        self.assert_request_type_saved_in_attributes(response, 'workout')
+
+    @pytest.mark.xfail
+    def test_missing_RelativeTo_slot(self):
+        intent = Intent({
+            'name': 'DefaultQuery',
+            'slots': {
+                'RequestType': {
+                    'name': 'RequestType',
+                    'value': 'workout'
+                }
+            }
+        })
+        response = im.query_intent(intent)
+        self.assert_response_is_reprompt(response)
+        self.assert_request_type_saved_in_attributes(response, 'workout')
 
 
 class TestQueryIntentWithPatchedOutGetWOD(object):
-    @pytest.yield_fixture(autouse=True)
-    def fakewod(self, mock_now):
-        wod = WOD({
-            'strength': 'strength section goes here',
-            'conditioning': 'conditioning section goes here',
-            'date': '2017-11-20T00:00:00.000Z',
-            'publishDate': '2017-11-20T00:00:00.000Z'
-        })
-        with patch('_ebcf_alexa.wods.get_wod', return_value=wod) as mock:
-            yield mock
-
     @pytest.mark.parametrize('request_type,expected_thing', [
         ('workout', 'workout'),
         ('full workout', 'full workout'),
@@ -156,5 +218,26 @@ class TestQueryIntentWithPatchedOutGetWOD(object):
         )
         assert expected_opening_sentence in response_ssml
         assert 'strength section goes here' not in response_ssml
+        assert 'conditioning section goes here' in response_ssml
+        assert not response.attributes
+
+    def test_empty_RelativeTo_slot(self):
+        """Assuming RelativeTo empty means the user intended to get today's workout"""
+        intent = Intent({
+            'name': 'DefaultQuery',
+            'slots': {
+                'RelativeTo': {
+                    'name': 'RelativeTo',
+                },
+                'RequestType': {
+                    'name': 'RequestType',
+                    'value': 'workout'
+                }
+            }
+        })
+        response = im.query_intent(intent)
+        response_ssml = response.output_speech.ssml
+        assert 'The workout for today, Monday November 20, 2017' in response_ssml
+        assert 'strength section goes here' in response_ssml
         assert 'conditioning section goes here' in response_ssml
         assert not response.attributes
