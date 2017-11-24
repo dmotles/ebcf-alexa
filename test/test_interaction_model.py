@@ -240,7 +240,6 @@ class TestQueryIntentWithPatchedOutGetWOD(object):
         assert not response.attributes
         assert response.should_end
 
-    @pytest.mark.xfail(reason='Not implemented yet')
     def test_missing_RelativeTo_slot(self):
         intent = Intent({
             'name': 'DefaultQuery',

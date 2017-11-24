@@ -207,7 +207,13 @@ def query_intent(intent: Intent) -> speechlet.SpeechletResponse:
     """
     Responds to most queries of the skill.
     """
-    relative_to = _get_relative_to_slot(intent.slots[RELATIVE_SLOT])
+    try:
+        relative_to_slot = intent.slots[RELATIVE_SLOT]
+    except KeyError:
+        relative_to = RelativeToSlot.TODAY
+    else:
+        relative_to = _get_relative_to_slot(relative_to_slot)
+
     try:
         request_type_slot, word_used = _get_request_type_slot(intent)
     except MissingSlot:
