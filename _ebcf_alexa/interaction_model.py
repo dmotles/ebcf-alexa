@@ -48,9 +48,9 @@ class RequestTypeSlot(Enum):
         'workout': 'workout',
         'wod': 'wod',
         'wad': 'wod',
-        'both': 'full workout',
-        'everything': 'full workout',
-        'full': 'full workout'})
+        'both': 'workout',
+        'everything': 'workout',
+        'full': 'workout'})
     STRENGTH = ('strength', {
         'strength': 'strength',
         'lifting': 'lifting'

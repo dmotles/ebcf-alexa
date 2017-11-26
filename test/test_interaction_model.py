@@ -152,7 +152,7 @@ class TestQueryIntentWithPatchedOutGetWOD(object):
 
     @pytest.mark.parametrize('request_type,expected_thing', [
         ('workout', 'workout'),
-        ('full workout', 'full workout'),
+        ('full workout', 'workout'),
         ('wad', 'wod')
     ])
     def test_request_type_is_RequestTypeSlot_FULL(self, request_type, expected_thing):
