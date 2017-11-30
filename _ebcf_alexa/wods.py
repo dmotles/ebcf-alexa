@@ -236,7 +236,8 @@ _ALIASES = {
     r'(\d+)"': r'\1<sub alias="inches">"</sub>',
     r'(\d+)\'': r'\1<sub alias="feet">\'</sub>',
     r'&': 'and',
-    r'(\d+) [Ss]ec\.? ': r'\1 second '
+    r'(\d+) [Ss]ec\.? ': r'\1 second ',
+    r'\bT2B\b': r'<sub alias="toes to bar">T2B</sub>'
 }
 
 

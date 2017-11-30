@@ -1,10 +1,12 @@
-from _ebcf_alexa import wods
 from _ebcf_alexa import env
-from unittest.mock import mock_open, patch, Mock
-import urllib.parse as parse
-import io
+from _ebcf_alexa import wods
+from _ebcf_alexa.speechlet import SSML as assert_valid_ssml  # not really an assert, but this does do validation
 from datetime import datetime, date
+from textwrap import dedent
+from unittest.mock import patch, Mock
+import io
 import pytest
+import urllib.parse as parse
 
 SAMPLE_WOD_JSON = r"""
 {"links": {
@@ -182,3 +184,16 @@ MASSAGE_FOR_TTS_TESTS = [
 @pytest.mark.parametrize('_input,expected', MASSAGE_FOR_TTS_TESTS)
 def test__massage_for_TTS(_input, expected):
     assert wods._massage_for_tts(_input) == expected
+
+
+class TestSSMLTranslation(object):
+    def test_t2b(self):
+        api_strength_sample = dedent("""
+        EMOM for 14 Min:
+        Even: 25 Sec Handstand Hold
+        Odd: (Strict T2B + Strict T2B Left + Strict T2B Right) x 3 or Skin the Cat + Invert + Front Lever Tuck + 3 Strict Toe to Rings 
+        """).splitlines(True)
+
+        output = wods._convert_ssml(api_strength_sample, 'Strength')
+        assert output.count('<sub alias="toes to bar">T2B</sub>') == 3
+        assert_valid_ssml(output)
