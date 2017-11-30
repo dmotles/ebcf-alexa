@@ -196,4 +196,6 @@ class TestSSMLTranslation(object):
 
         output = wods._convert_ssml(api_strength_sample, 'Strength')
         assert output.count('<sub alias="toes to bar">T2B</sub>') == 3
+        assert ' times 3' in output
+        assert ' x 3 ' not in output
         assert_valid_ssml(output)
