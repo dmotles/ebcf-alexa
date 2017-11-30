@@ -187,7 +187,11 @@ def test__massage_for_TTS(_input, expected):
 
 
 class TestSSMLTranslation(object):
-    def test_t2b(self):
+    def test_11_30_2017_T2B_Times_And_Plus(self):
+        """
+        This represents a strength section that had a lot of weird alexa-isms on
+        11/30/2017
+        """
         api_strength_sample = dedent("""
         EMOM for 14 Min:
         Even: 25 Sec Handstand Hold
@@ -195,7 +199,9 @@ class TestSSMLTranslation(object):
         """).splitlines(True)
 
         output = wods._convert_ssml(api_strength_sample, 'Strength')
+        print(output)
         assert output.count('<sub alias="toes to bar">T2B</sub>') == 3
         assert ' times 3' in output
         assert ' x 3 ' not in output
+        assert output.count('<break strength="strong"/> + ') == 5
         assert_valid_ssml(output)

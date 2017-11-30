@@ -239,6 +239,7 @@ _ALIASES = {
     r'(\d+) [Ss]ec\.? ': r'\1 second ',
     r'\bT2B\b': r'<sub alias="toes to bar">T2B</sub>',  # T2B => toes 2 bar
     r'( ?)\bx ?(\b\d+\b)': r'\1times \2',  # 'x3' or ' x 3' => times 3
+    r' \+ ': '<break strength="strong"/> + ', # slow down between plusses
 }
 
 
