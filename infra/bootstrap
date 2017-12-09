@@ -1,0 +1,215 @@
+#!/usr/bin/env python3
+"""
+This script deploys or updates new versions of the deploy/management infrastructure.
+"""
+import os
+import boto3
+import sys
+import yaml
+import logging
+import threading
+import time
+import pprint
+from functools import wraps
+from typing import Callable, Any, Optional
+from botocore.exceptions import ClientError
+import pdb
+
+
+# hard-coded stack params
+REGION = 'us-east-1'
+TEST_STACK = 'test-ebcf-alexa'
+PROD_STACK = 'ebcf-alexa'
+ROOT = os.path.dirname(os.path.realpath(__file__))
+TEMPLATE_PATH = os.path.join(ROOT, 'cloudformation', 'ebcf-alexa-infra.template.yml')
+
+# libs
+cfn = boto3.resource('cloudformation', region_name='us-east-1')
+cfn_client = cfn.meta.client
+log = logging.getLogger(__name__)
+
+
+##
+#
+# YAML
+#
+##
+class CfnYamlLoader(yaml.Loader):
+    def construct_cfn_func_list(self, node):
+        fn = 'Fn::{}'.format(node.tag[1:])
+        return {fn: [self.construct_yaml_str(n) for n in node.value]}
+
+    def construct_cfn_func_scalar(self, node):
+        fn = 'Fn::{}'.format(node.tag[1:])
+        return {fn: node.value}
+
+    def construct_cfn_func_join(self, node):
+        delimeter, values = node.value
+        return {'Fn::Join': [self.construct_yaml_str(delimeter), map(self.construct_yaml_str, values)]}
+
+
+CfnYamlLoader.add_constructor('!GetAtt', CfnYamlLoader.construct_cfn_func_list)
+CfnYamlLoader.add_constructor('!Ref', CfnYamlLoader.construct_cfn_func_scalar)
+CfnYamlLoader.add_constructor('!Join', CfnYamlLoader.construct_cfn_func_join)
+
+
+class StackWatcher(threading.Thread):
+    SUCCESS = frozenset((
+        'CREATE_COMPLETE',
+        'UPDATE_COMPLETE'
+    ))
+
+    FAILURE = frozenset((
+        'CREATE_FAILED',
+        'DELETE_FAILED',
+        'ROLLBACK_COMPLETE',
+        'ROLLBACK_FAILED',
+        'UPDATE_ROLLBACK_COMPLETE',
+        'UPDATE_ROLLBACK_FAILED'
+    ))
+
+    def __init__(self, stack):
+        super(StackWatcher, self).__init__()
+        self.__lock = threading.Lock()
+        self.__done = threading.Event()
+        self.__stack = stack
+        self.__exc = None   # < lock
+        self.__result = None  # < lock
+
+    def run(self):
+        try:
+            while 'IN_PROGRESS' in self.__stack.stack_status:
+                time.sleep(5)
+                self.__stack.load() # get status
+            with self.__lock:
+                self.__result = (self.__stack.stack_status, self.__stack.stack_status_reason)
+        except Exception as e:
+            with self.__lock:
+                self.__exc = e
+        finally:
+            self.__done.set()
+
+    def wait(self, timeout=7200):
+        self.join(timeout)
+        if not self.__done.wait(timeout):
+            raise Exception('Timed out waiting for done')
+        with self.__lock:
+            if self.__exc is not None:
+                raise self.__exc
+            return self.__result
+
+
+class Template(object):
+    def __init__(self, template_content: bytes):
+        self.template_content = template_content.decode('utf-8')
+        res = cfn_client.validate_template(TemplateBody=self.template_content)
+        log.debug('validate_template: %r', res)
+        self.parameters = {
+            p['ParameterKey']: p
+            for p in res['Parameters']
+        }
+        self.description = res.get('Description')
+        self.capabilities = res['Capabilities']
+
+    def __repr__(self):
+        return 'Template({!r})'.format(self.template_content)
+
+    def __str__(self):
+        return 'Template(parameters={0.parameters!r}, '\
+                'description={0.description!r}, '\
+                'capabilities={0.capabilities!r})'.format(self)
+
+    def create_params(self, stack_name: str, **defaults):
+        spaces = ''
+        if len(stack_name) < 25:
+            spaces = ' ' * (25 - len(stack_name))
+        print('*********************************************************')
+        print('* NEW STACK {} is being created.{} *'.format(stack_name, spaces))
+        print('* Please validate/enter values for the following        *')
+        print('* parameters:                                           *')
+        print('*********************************************************')
+        params = []
+        for param_name, param in self.parameters.items():
+            default = param.get('DefaultValue')
+            default = defaults.get(param_name, default)
+            value = prompt_new_value(param_name, default)
+            if value is None:
+                continue
+            params.append({
+                'ParameterKey': param_name,
+                'ParameterValue': value
+            })
+        return params
+
+    def create_stack(self, stack_name: str, **defaults):
+        stack = cfn.create_stack(
+            StackName=stack_name,
+            TemplateBody=self.template_content,
+            Parameters=self.create_params(stack_name, **defaults),
+            Capabilities=self.capabilities,
+            OnFailure='DELETE' # create
+        )
+        watcher = StackWatcher(stack)
+        watcher.start()
+        watcher.wait()
+        return stack
+
+
+def prompt_new_value(param_name: str, default: Optional[str]) -> Optional[str]:
+    prompt = '{} [default: {}] : '.format(param_name, default) \
+        if default is not None else '{} : '.format(param_name)
+
+    while True:
+        val = input(prompt).strip()
+        if val:
+            return val
+        else:
+            if default is not None:
+                return
+            print('{} does not have a default value and requires a value.'.format(param_name),
+                  file=sys.stderr)
+
+
+def load_template(template_name: str) -> Template:
+    with open(template_name, 'rb') as f:
+        return Template(f.read())
+
+
+def get_stack(stack_name: str):
+    try:
+        for stack in cfn.stacks.filter(StackName=stack_name):
+            if stack.name == stack_name:
+                return stack
+    except ClientError as clienterr:
+        response = clienterr.response['Error']
+        not_exist_msg = '{} does not exist'.format(stack_name)
+        if response['Type'] == 'Sender' and \
+                response['Code'] == 'ValidationError' and \
+                not_exist_msg in response['Message']:
+            return None
+        raise
+
+
+def create_or_update_stack(stack_name: str, template: Template, **param_defaults):
+    stack = get_stack(stack_name)
+    if stack is None:
+        template.create_stack(stack_name, **param_defaults)
+    else:
+        log.info('need to update instead of create..')
+
+
+
+def main() -> int:
+    logging.basicConfig(format='%(module)-32s %(levelname)-8s: %(message)s', level=logging.DEBUG)
+    template = load_template(TEMPLATE_PATH)
+    create_or_update_stack(TEST_STACK, template)
+    # 3. merge old stack params with new stack params.
+    # 3a. ask for missing values?
+    # 4. do a stack update
+    # 5. wait for it to complete or fail
+    # 6. report back
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

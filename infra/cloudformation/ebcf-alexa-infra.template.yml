@@ -1,0 +1,115 @@
+# vim: ft=yaml
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  GitHubUser:
+    Type: String
+  GitHubRepo:
+    Type: String
+  GitHubBranch:
+    Type: String
+  GitHubOAuthToken:
+    Type: String
+    NoEcho: true
+Metadata:
+  'AWS::CloudFormation::Designer':
+    1509f587-f68f-4459-9204-4436de8f137f:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 230
+        'y': 90
+      z: 0
+      embeds: []
+      isrelatedto:
+        - 369760f3-0787-4ef4-ab16-9d12aa36759b
+        - d5359a0a-2c3b-447d-86dd-918e0fde437b
+    369760f3-0787-4ef4-ab16-9d12aa36759b:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 90
+        'y': 60
+      z: 0
+      embeds: []
+    d5359a0a-2c3b-447d-86dd-918e0fde437b:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 90
+        'y': 130
+      z: 0
+      embeds: []
+Resources:
+  CODEPIPELINE:
+    Type: 'AWS::CodePipeline::Pipeline'
+    Properties:
+      ArtifactStore:
+          Location: !Ref ArtifactBucket
+          Type: S3
+      RoleArn: !GetAtt 
+        - CodePipelineRole
+        - Arn
+      Stages:
+        - Name: Source
+          Actions:
+            - ActionTypeId:
+                Category: Source
+                Owner: ThirdParty
+                Provider: GitHub
+                Version: '1'
+              Configuration:
+                Owner: !Ref GitHubUser
+                Repo: !Ref GitHubRepo
+                Branch: !Ref GitHubBranch
+                OAuthToken: !Ref GitHubOAuthToken
+              OutputArtifacts:
+                  - Name: github-src
+              Name: GitHub
+              RunOrder: 1
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 1509f587-f68f-4459-9204-4436de8f137f
+  ArtifactBucket:
+    Type: 'AWS::S3::Bucket'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 369760f3-0787-4ef4-ab16-9d12aa36759b
+  CodePipelineRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - 'sts:AssumeRole'
+            Effect: Allow
+            Principal:
+              Service:
+                - codepipeline.amazonaws.com
+        Version: 2012-10-17
+      Path: /
+      Policies:
+        - PolicyName: CodePipelineAccess
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - 's3:*'
+                  - 'cloudformation:CreateStack'
+                  - 'cloudformation:DescribeStacks'
+                  - 'cloudformation:DeleteStack'
+                  - 'cloudformation:UpdateStack'
+                  - 'cloudformation:CreateChangeSet'
+                  - 'cloudformation:ExecuteChangeSet'
+                  - 'cloudformation:DeleteChangeSet'
+                  - 'cloudformation:DescribeChangeSet'
+                  - 'cloudformation:SetStackPolicy'
+                  - 'iam:PassRole'
+                  - 'sns:Publish'
+                Effect: Allow
+                Resource: '*'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: d5359a0a-2c3b-447d-86dd-918e0fde437b
