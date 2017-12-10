@@ -3,10 +3,13 @@ AWSTemplateFormatVersion: 2010-09-09
 Parameters:
   GitHubUser:
     Type: String
+    Default: 'dmotles'
   GitHubRepo:
     Type: String
+    Default: 'ebcf-alexa'
   GitHubBranch:
     Type: String
+    Default: 'master'
   GitHubOAuthToken:
     Type: String
     NoEcho: true
