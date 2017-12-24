@@ -1,3 +1,7 @@
+# vim: ft=yaml
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  This is used to deploy/update the lambda function. It's called by the code pipeline.
 Parameters:
     LambdaS3Bucket:
         Type: String
