@@ -31,15 +31,12 @@ class Stack(object):
     def name(self) -> str:
         return self._resource.name
 
-    def wait_for(self,
-                 done_states: Set[str],
-                 fail_states: Set[str],
-                 poll_interval: int=10):
+    def wait_for(self, done_states: Set[str], fail_states: Set[str]):
         exit_loop_states = done_states | fail_states
         while self.status not in exit_loop_states:
             LOG.debug('Stack %s in status %s because %s',
                       self.name, self.status, self.status_reason)
-            time.sleep(poll_interval)
+            time.sleep(10) # 10 seconds seems like a good poll interval
             self._resource.update()
         if self.status in fail_states:
             raise StackFailure(
