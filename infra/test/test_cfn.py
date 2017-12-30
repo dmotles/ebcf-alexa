@@ -81,8 +81,10 @@ class MockStackResource(object):
         self._state_iter = iter(mock_stack_states)
         self.stack_status, self.stack_status_reason = next(self._state_iter)
         self.name = name
+        self.update_call_count = 0
 
     def update(self) -> None:
+        self.update_call_count += 1
         try:
             self.stack_status, self.stack_status_reason = next(self._state_iter)
         except StopIteration:
@@ -97,8 +99,8 @@ class MockStackResource(object):
 # Stack
 ##
 
-
-def test_stack_wait_for():
+@patch('time.sleep')
+def test_stack_wait_for(mock_sleep):
     stack = cfn.Stack(
         MockStackResource('test_stack', [
             ('CREATE_IN_PROGRESS', ''),
@@ -106,14 +108,14 @@ def test_stack_wait_for():
             ('CREATE_COMPLETE', ''),
         ])
     )
-    with patch('time.sleep') as mock_sleep:
-        stack.wait_for(done_states={'CREATE_COMPLETE'},
-                       fail_states={'CREATE_FAILED'})
-        assert mock_sleep.call_count == 2
-        mock_sleep.assert_called_with(10)
+    stack.wait_for(done_states={'CREATE_COMPLETE'},
+                   fail_states={'CREATE_FAILED'})
+    assert mock_sleep.call_count == 2
+    mock_sleep.assert_called_with(10)
 
 
-def test_stack_wait_for_failure():
+@patch('time.sleep')
+def test_stack_wait_for_failure(mock_sleep):
     stack = cfn.Stack(
         MockStackResource('test_stack', [
             ('CREATE_IN_PROGRESS', ''),
@@ -123,13 +125,12 @@ def test_stack_wait_for_failure():
             ('CREATE_FAILED', 'shits broken'),
         ])
     )
-    with patch('time.sleep') as mock_sleep:
-        with pytest.raises(cfn.StackFailure) as exc_info:
-            stack.wait_for(done_states={'CREATE_COMPLETE'},
-                           fail_states={'CREATE_FAILED'})
-        assert str(exc_info.value) == 'CREATE_FAILED: shits broken'
-        assert mock_sleep.call_count == 4
-        mock_sleep.assert_called_with(10)
+    with pytest.raises(cfn.StackFailure) as exc_info:
+        stack.wait_for(done_states={'CREATE_COMPLETE'},
+                       fail_states={'CREATE_FAILED'})
+    assert str(exc_info.value) == 'CREATE_FAILED: shits broken'
+    assert mock_sleep.call_count == 4
+    mock_sleep.assert_called_with(10)
 
 
 ##
@@ -159,10 +160,11 @@ def test_client_validate_template(client):
     ['CAPABILITY_IAM']
 ])
 def test_client_create_stack(client, parameters, capabilities):
-    assert client.create_stack('stack_name', 'stack_body',
-                               parameters=parameters,
-                               capabilities=capabilities)._resource is \
-        client._resource.create_stack.return_value
+    ret = client.create_stack('stack_name', 'stack_body',
+                              parameters=parameters,
+                              capabilities=capabilities,
+                              block=False)
+    assert ret._resource == client._resource.create_stack.return_value
     client._resource.create_stack.assert_called_once_with(
         StackName='stack_name',
         TemplateBody='stack_body',
@@ -170,6 +172,44 @@ def test_client_create_stack(client, parameters, capabilities):
         Capabilities=capabilities
     )
 
+
+@patch('time.sleep')
+def test_client_create_stack_blocking(mock_sleep, client):
+    # Make it so the service resource create_stack returns the above
+    # MockStackResource implementation that automatically finishes
+    client._resource.create_stack.side_effect = (
+        lambda StackName, TemplateBody, Parameters, Capabilities:
+        MockStackResource(StackName, [
+            ('CREATE_IN_PROGRESS', ''),
+            ('CREATE_COMPLETE', '')
+        ])
+    )
+    ret = client.create_stack('stack_name', 'stack_body', block=True)
+    assert ret.name == 'stack_name'
+    assert ret._resource.update_call_count == 1
+    assert mock_sleep.call_count == 1
+
+
+@pytest.mark.parametrize('status', [
+    'CREATE_FAILED',
+    'ROLLBACK_IN_PROGRESS',
+    'ROLLBACK_COMPLETE',
+    'ROLLBACK_FAILED'
+])
+@patch('time.sleep')
+def test_client_create_stack_error(mock_sleep, client, status):
+    # Make it so the service resource create_stack returns the above
+    # MockStackResource implementation that automatically finishes
+    client._resource.create_stack.side_effect = (
+        lambda StackName, TemplateBody, Parameters, Capabilities:
+        MockStackResource(StackName, [
+            ('CREATE_IN_PROGRESS', ''),
+            (status, 'error')
+        ])
+    )
+    with pytest.raises(cfn.StackFailure):
+        client.create_stack('stack_name', 'stack_body', block=True)
+    assert mock_sleep.called
 
 ##
 # Template

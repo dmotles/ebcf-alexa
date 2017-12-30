@@ -65,6 +65,16 @@ class Client(object):
             Parameters=parameters,
             Capabilities=capabilities
         ))
+        if block:
+            stack.wait_for(
+                {'CREATE_COMPLETE'},
+                fail_states={
+                    'CREATE_FAILED',
+                    'ROLLBACK_IN_PROGRESS',
+                    'ROLLBACK_COMPLETE',
+                    'ROLLBACK_FAILED'
+                }
+            )
         return stack
 
 
