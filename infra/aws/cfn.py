@@ -2,11 +2,8 @@ import logging
 import boto3
 from typing import Optional, List, Callable, Dict, Set, Any
 import time
+from .constants import REGION
 
-
-REGION = 'us-east-1'
-TEST_STACK = 'test-ebcf-alexa'
-PROD_STACK = 'ebcf-alexa'
 
 LOG = logging.getLogger(__name__)
 
@@ -77,6 +74,11 @@ class Client(object):
             )
         return stack
 
+    def get_stack(self, name: str) -> Optional[Stack]:
+        for s in self._resource.stacks.filter(StackName=name):
+            return Stack(s)
+        return None
+
 
 class StackFailure(Exception):
     pass
@@ -104,4 +106,23 @@ class Template(object):
         return 'Template(parameters={0.parameters!r}, ' \
                'description={0.description!r}, ' \
                'capabilities={0.capabilities!r})'.format(self)
+
+    def _merge_parameters(self, params: dict) -> list:
+        merged_params = []
+        for key, template_param in self.parameters.items():
+            if key in params:
+                merged_params.append({
+                    'ParameterKey': key,
+                    'ParameterValue': params[key]
+                })
+            elif 'DefaultValue' not in template_param:
+                raise KeyError('{} is not specified and has no default value'.format(key))
+        return merged_params
+
+    def create_stack(self, stack_name: str, params: dict) -> Stack:
+        return self._client.create_stack(stack_name,
+                                         self.template_content,
+                                         block=True,
+                                         parameters=self._merge_parameters(params),
+                                         capabilities=self.capabilities)
 
