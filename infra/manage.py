@@ -3,8 +3,6 @@ import os
 import sys
 from typing import Optional
 
-import botocore.exceptions as boto_exc
-
 from aws import ddb, cfn
 
 ROOT = os.path.dirname(os.path.realpath(__file__))
@@ -24,22 +22,20 @@ def get_stack_config(env_name: str) -> dict:
     return table.get_row(env_name=env_name)
 
 
-def create_stack(name: str, config_env: str, template: cfn.Template) -> cfn.Stack:
-    return template.create_stack(name, get_stack_config(config_env))
-
-
 def create_or_update_stack(name: str,
                            config_env: str,
                            template: cfn.Template,
                            client: Optional[cfn.Client]=None) -> None:
+    config = get_stack_config(config_env)
     if client is None:
         client = cfn.Client()
     stack = client.get_stack(name)
     if stack is None:
         LOG.debug('Creating stack: %s', name)
-        create_stack(name, config_env, template)
+        template.create_stack(name, config)
     else:
         LOG.debug('%s already exists', name)
+        template.update_stack(stack, config)
 
 
 def load_template(template_name: str) -> cfn.Template:
@@ -52,9 +48,14 @@ def setup_logging():
     handler.setLevel(logging.DEBUG)
     formatter = logging.Formatter('%(name)-32s %(levelname)-8s: %(message)s')
     handler.setFormatter(formatter)
-    for logger in (LOG, logging.getLogger('boto3')):
-        logger.setLevel(logging.DEBUG)
-        logger.addHandler(handler)
+
+    root = logging.getLogger()
+    root.setLevel(logging.DEBUG)
+    root.addHandler(handler)
+
+    # for logger in (LOG, logging.getLogger('boto3')):
+    #     logger.setLevel(logging.DEBUG)
+    #     logger.addHandler(handler)
 
 
 def main() -> int:

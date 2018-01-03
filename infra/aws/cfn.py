@@ -15,6 +15,10 @@ def create_cfn_resource():
 class Stack(object):
     def __init__(self, stack_resource):
         self._resource = stack_resource
+        self._client = self._resource.meta.client
+
+    def get_template(self) -> str:
+        return self._client.get_template(StackName=self.name)['TemplateBody']
 
     @property
     def status(self) -> str:
@@ -28,6 +32,10 @@ class Stack(object):
     def name(self) -> str:
         return self._resource.name
 
+    @property
+    def parameter_keys(self) -> Set[str]:
+        return set(p['ParameterKey'] for p in self._resource.parameters)
+
     def wait_for(self, done_states: Set[str], fail_states: Set[str]):
         exit_loop_states = done_states | fail_states
         while self.status not in exit_loop_states:
@@ -38,6 +46,32 @@ class Stack(object):
         if self.status in fail_states:
             raise StackFailure(
                 '{}: {}'.format(self.status, self.status_reason))
+
+    def update(self,
+               template_body: Optional[dict]=None,
+               block: bool=True,
+               parameters: Optional[List[Dict[str,str]]]=None,
+               capabilities: Optional[List[str]]=None) -> None:
+        call_args = {}
+        if template_body is None:
+            call_args['UsePreviousTemplate'] = True
+        else:
+            call_args['TemplateBody'] = template_body
+        if capabilities is not None:
+            call_args['Capabilities'] = capabilities
+        if parameters is not None:
+            call_args['Parameters'] = parameters
+        self._resource.update(**call_args)
+
+        if block:
+            waiter = self._client.get_waiter('stack_update_complete')
+            waiter.wait(
+                StackName=self.name,
+                WaiterConfig={
+                    'Delay': 10,
+                    'MaxAttempts': 120
+                }
+            )
 
 
 class Client(object):
@@ -126,3 +160,33 @@ class Template(object):
                                          parameters=self._merge_parameters(params),
                                          capabilities=self.capabilities)
 
+    def _merge_update_params(self, params: Dict[str, str], old_param_keys: Set[str]) -> List[Dict[str, str]]:
+        update_params = []
+        for key, template_param in self.parameters.items():
+            if key in params:
+                update_params.append({
+                    'ParameterKey': key,
+                    'ParameterValue': params[key]
+                })
+            elif key in old_param_keys:
+                update_params.append({
+                    'ParameterKey': key,
+                    'UsePreviousValue': True
+                })
+            elif 'DefaultValue' not in template_param:
+                raise KeyError('{} is not specified and has no default value'.format(key))
+        return update_params
+
+    def update_stack(self, stack: Stack, params: dict):
+        old_param_keys = stack.parameter_keys
+        update_args = dict(
+            parameters=self._merge_update_params(params, old_param_keys),
+            capabilities=self.capabilities
+        )
+
+        # same template, parameter-only update
+        if set(self.parameters) != old_param_keys or \
+                self.template_content != stack.get_template():
+            update_args['template_body'] = self.template_content
+
+        stack.update(**update_args)
