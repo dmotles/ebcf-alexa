@@ -1,15 +1,66 @@
 import logging
-import boto3
-from typing import Optional, List, Callable, Dict, Set, Any
 import time
+
+from typing import Optional, List, Callable, Dict, Set, AbstractSet, Generator
+
+import boto3
+
 from .constants import REGION
 
 
 LOG = logging.getLogger(__name__)
 
 
+##
+# CLOUDFORMATION STACK AND RESOURCE STATES
+#
+# These are states that both stacks and resources can be in that we care about.
+# See https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-cfn-describing-stacks.html
+##
+UPDATE_SUCCESS_STATES = frozenset(['UPDATE_COMPLETE'])
+CREATE_SUCCESS_STATES = frozenset(['CREATE_COMPLETE'])
+DELETE_SUCCESS_STATES = frozenset(['DELETE_COMPLETE'])
+UPDATE_FAILURE_STEADY_STATES = frozenset([
+    'UPDATE_ROLLBACK_FAILED', 'UPDATE_ROLLBACK_COMPLETE'
+])
+UPDATE_FAILURE_STATES = UPDATE_FAILURE_STEADY_STATES.union({
+    'UPDATE_ROLLBACK_IN_PROGRESS',
+    'UPDATE_ROLLBACK_COMPLETE_CLEANUP_IN_PROGRESS',
+})
+CREATE_FAILURE_STEADY_STATES = frozenset([
+    'CREATE_FAILED', 'ROLLBACK_COMPLETE', 'ROLLBACK_FAILED'
+])
+CREATE_FAILURE_STATES = CREATE_FAILURE_STEADY_STATES.union({
+    'ROLLBACK_IN_PROGRESS'
+})
+DELETE_FAILURE_STATES = frozenset(['DELETE_FAILED'])
+STEADY_STATE = (
+        UPDATE_SUCCESS_STATES |
+        CREATE_SUCCESS_STATES |
+        DELETE_SUCCESS_STATES |
+        UPDATE_FAILURE_STEADY_STATES |
+        CREATE_FAILURE_STEADY_STATES |
+        DELETE_FAILURE_STATES
+)
+
+
 def create_cfn_resource():
     return boto3.resource('cloudformation', region_name=REGION)
+
+
+class StackEvent(object):
+    def __init__(self, event):
+        self.logical_resource_id: str = event.logical_resource_id
+        self.physical_resource_id: str = event.physical_resource_id
+        self.resource_type: str = event.resource_type
+        self.resource_status: str = event.resource_status
+        self.status_reason: str = event.resource_status_reason
+
+    def __str__(self):
+        return (
+            '{0.logical_resource_id} [{0.physical_resource_id}] of type '
+            '{0.resource_type} {0.resource_status} because {0.status_reason}'
+        ).format(self)
 
 
 class Stack(object):
@@ -36,16 +87,18 @@ class Stack(object):
     def parameter_keys(self) -> Set[str]:
         return set(p['ParameterKey'] for p in self._resource.parameters)
 
-    def wait_for(self, done_states: Set[str], fail_states: Set[str]):
+    def wait_for(self, done_states: AbstractSet[str], fail_states: AbstractSet[str]):
         exit_loop_states = done_states | fail_states
         while self.status not in exit_loop_states:
             LOG.debug('Stack %s in status %s because %s',
                       self.name, self.status, self.status_reason)
             time.sleep(10) # 10 seconds seems like a good poll interval
-            self._resource.update()
+            self._resource.reload()
         if self.status in fail_states:
             raise StackFailure(
-                '{}: {}'.format(self.status, self.status_reason))
+                '{}: {}'.format(self.status, self.status_reason),
+                self
+            )
 
     def update(self,
                template_body: Optional[dict]=None,
@@ -64,14 +117,13 @@ class Stack(object):
         self._resource.update(**call_args)
 
         if block:
-            waiter = self._client.get_waiter('stack_update_complete')
-            waiter.wait(
-                StackName=self.name,
-                WaiterConfig={
-                    'Delay': 10,
-                    'MaxAttempts': 120
-                }
-            )
+            self.wait_for(UPDATE_SUCCESS_STATES, UPDATE_FAILURE_STATES)
+
+    def iter_failed_stack_events(self) -> Generator[StackEvent, None, None]:
+        fail_statuses = UPDATE_FAILURE_STEADY_STATES | CREATE_FAILURE_STEADY_STATES
+        for event_resource in self._resource.events.all():
+            if event_resource.resource_status in fail_statuses:
+                yield StackEvent(event_resource)
 
 
 class Client(object):
@@ -97,15 +149,7 @@ class Client(object):
             Capabilities=capabilities
         ))
         if block:
-            stack.wait_for(
-                {'CREATE_COMPLETE'},
-                fail_states={
-                    'CREATE_FAILED',
-                    'ROLLBACK_IN_PROGRESS',
-                    'ROLLBACK_COMPLETE',
-                    'ROLLBACK_FAILED'
-                }
-            )
+            stack.wait_for(CREATE_SUCCESS_STATES, CREATE_FAILURE_STATES)
         return stack
 
     def get_stack(self, name: str) -> Optional[Stack]:
@@ -115,7 +159,9 @@ class Client(object):
 
 
 class StackFailure(Exception):
-    pass
+    def __init__(self, msg, stack: Stack):
+        super().__init__(msg)
+        self.stack = stack
 
 
 class Template(object):

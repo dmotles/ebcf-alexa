@@ -30,12 +30,17 @@ def create_or_update_stack(name: str,
     if client is None:
         client = cfn.Client()
     stack = client.get_stack(name)
-    if stack is None:
-        LOG.debug('Creating stack: %s', name)
-        template.create_stack(name, config)
-    else:
-        LOG.debug('%s already exists', name)
-        template.update_stack(stack, config)
+    try:
+        if stack is None:
+            LOG.debug('Creating stack: %s', name)
+            template.create_stack(name, config)
+        else:
+            LOG.debug('%s already exists', name)
+            template.update_stack(stack, config)
+    except cfn.StackFailure as fail:
+        LOG.error(str(fail))
+        for stack_event in fail.stack.iter_failed_stack_events():
+            LOG.error(str(stack_event))
 
 
 def load_template(template_name: str) -> cfn.Template:
@@ -49,13 +54,13 @@ def setup_logging():
     formatter = logging.Formatter('%(name)-32s %(levelname)-8s: %(message)s')
     handler.setFormatter(formatter)
 
-    root = logging.getLogger()
-    root.setLevel(logging.DEBUG)
-    root.addHandler(handler)
+    #root = logging.getLogger()
+    #root.setLevel(logging.DEBUG)
+    #root.addHandler(handler)
 
-    # for logger in (LOG, logging.getLogger('boto3')):
-    #     logger.setLevel(logging.DEBUG)
-    #     logger.addHandler(handler)
+    for logger in (LOG, logging.getLogger('aws')):
+        logger.setLevel(logging.DEBUG)
+        logger.addHandler(handler)
 
 
 def main() -> int:
