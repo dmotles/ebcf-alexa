@@ -1,5 +1,6 @@
 import logging
 import time
+import uuid
 
 from typing import Optional, List, Callable, Dict, Set, AbstractSet, Generator
 
@@ -48,6 +49,10 @@ def create_cfn_resource():
     return boto3.resource('cloudformation', region_name=REGION)
 
 
+def generate_client_request_token() -> str:
+    return 'ebcf-alexa-infra-manage-{}'.format(uuid.uuid4())
+
+
 class StackEvent(object):
     def __init__(self, event):
         self.logical_resource_id: str = event.logical_resource_id
@@ -64,9 +69,10 @@ class StackEvent(object):
 
 
 class Stack(object):
-    def __init__(self, stack_resource):
+    def __init__(self, stack_resource, last_request_token: Optional[str]=None):
         self._resource = stack_resource
         self._client = self._resource.meta.client
+        self._last_request_token = last_request_token
 
     def get_template(self) -> str:
         return self._client.get_template(StackName=self.name)['TemplateBody']
@@ -105,7 +111,10 @@ class Stack(object):
                block: bool=True,
                parameters: Optional[List[Dict[str,str]]]=None,
                capabilities: Optional[List[str]]=None) -> None:
-        call_args = {}
+        self._last_request_token = generate_client_request_token()
+        call_args = {
+            'ClientRequestToken': self._last_request_token
+        }
         if template_body is None:
             call_args['UsePreviousTemplate'] = True
         else:
@@ -122,6 +131,9 @@ class Stack(object):
     def iter_failed_stack_events(self) -> Generator[StackEvent, None, None]:
         fail_statuses = UPDATE_FAILURE_STEADY_STATES | CREATE_FAILURE_STEADY_STATES
         for event_resource in self._resource.events.all():
+            if self._last_request_token is not None and \
+                    event_resource.client_request_token != self._last_request_token:
+                continue
             if event_resource.resource_status in fail_statuses:
                 yield StackEvent(event_resource)
 
@@ -142,12 +154,17 @@ class Client(object):
                      block: bool=True,
                      parameters: Optional[List[Dict[str,str]]]=None,
                      capabilities: Optional[List[str]]=None) -> Stack:
-        stack = Stack(self._resource.create_stack(
-            StackName=name,
-            TemplateBody=body,
-            Parameters=parameters,
-            Capabilities=capabilities
-        ))
+        token = generate_client_request_token()
+        stack = Stack(
+            self._resource.create_stack(
+                StackName=name,
+                TemplateBody=body,
+                Parameters=parameters,
+                Capabilities=capabilities,
+                ClientRequestToken=token
+            ),
+            token
+        )
         if block:
             stack.wait_for(CREATE_SUCCESS_STATES, CREATE_FAILURE_STATES)
         return stack
