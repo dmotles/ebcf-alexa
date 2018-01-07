@@ -1,5 +1,6 @@
 # vim: ft=yaml
 AWSTemplateFormatVersion: 2010-09-09
+
 Parameters:
   GitHubUser:
     Type: String
@@ -13,38 +14,10 @@ Parameters:
   GitHubOAuthToken:
     Type: String
     NoEcho: true
-Metadata:
-  'AWS::CloudFormation::Designer':
-    1509f587-f68f-4459-9204-4436de8f137f:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 230
-        'y': 90
-      z: 0
-      embeds: []
-      isrelatedto:
-        - 369760f3-0787-4ef4-ab16-9d12aa36759b
-        - d5359a0a-2c3b-447d-86dd-918e0fde437b
-    369760f3-0787-4ef4-ab16-9d12aa36759b:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 90
-        'y': 60
-      z: 0
-      embeds: []
-    d5359a0a-2c3b-447d-86dd-918e0fde437b:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 90
-        'y': 130
-      z: 0
-      embeds: []
+  RolePath:
+    Type: String
+    Default: '/ebcf-alexa/'
+
 Resources:
   CODEPIPELINE:
     Type: 'AWS::CodePipeline::Pipeline'
@@ -52,9 +25,7 @@ Resources:
       ArtifactStore:
           Location: !Ref ArtifactBucket
           Type: S3
-      RoleArn: !GetAtt 
-        - CodePipelineRole
-        - Arn
+      RoleArn: !GetAtt [CodePipelineRole, Arn]
       Stages:
         - Name: Source
           Actions:
@@ -72,14 +43,57 @@ Resources:
                   - Name: github-src
               Name: GitHub
               RunOrder: 1
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 1509f587-f68f-4459-9204-4436de8f137f
+        - Name: Build
+          Actions:
+            - ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref CODEBUILD
+              InputArtifacts:
+                  - Name: github-src
+              OutputArtifacts:
+                  - Name: ebcf-alexa
+              Name: Build
+
+  CODEBUILD:
+    Type: 'AWS::CodeBuild::Project'
+    Properties:
+        Artifacts:
+            Type: CODEPIPELINE
+        Description: 'Codebuild for ebcf-alexa'
+        Name: 'ebcf-alexa'
+        ServiceRole: !GetAtt [CodeBuilderRole, Arn]
+        Source:
+            Type: CODEPIPELINE
+        Environment:
+            Type: LINUX_CONTAINER
+            Image: '752373493987.dkr.ecr.us-east-1.amazonaws.com/ebcf-alexa:latest'
+            ComputeType: BUILD_GENERAL1_SMALL
+
   ArtifactBucket:
     Type: 'AWS::S3::Bucket'
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 369760f3-0787-4ef4-ab16-9d12aa36759b
+
+##
+# IAM ROLES
+##
+
+  CodeBuilderRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - 'sts:AssumeRole'
+            Effect: Allow
+            Principal:
+              Service:
+                - codebuild.amazonaws.com
+        Version: 2012-10-17
+      Path: !Ref RolePath
+
   CodePipelineRole:
     Type: 'AWS::IAM::Role'
     Properties:
@@ -92,7 +106,7 @@ Resources:
               Service:
                 - codepipeline.amazonaws.com
         Version: 2012-10-17
-      Path: /
+      Path: !Ref RolePath
       Policies:
         - PolicyName: CodePipelineAccess
           PolicyDocument:
@@ -113,6 +127,8 @@ Resources:
                   - 'sns:Publish'
                 Effect: Allow
                 Resource: '*'
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: d5359a0a-2c3b-447d-86dd-918e0fde437b
+              - Action:  # For CodeBuild actions
+                  - 'codebuild:StartBuild'
+                  - 'codebuild:BatchGetBuilds'
+                Effect: Allow
+                Resource: '*'
