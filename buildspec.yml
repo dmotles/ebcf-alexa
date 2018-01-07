@@ -5,6 +5,8 @@ phases:
         commands:
             - echo Running unit tests on `date`
             - python3 setup.py test
+            - echo Validating lambda CFN template on `date`
+            - infra/validate-cfn infra/cloudformation/ebcf-alexa-lambda.template.yml
     build:
         commands:
             - echo Starting build on `date`
@@ -20,6 +22,7 @@ phases:
                 --install-platbase=
                 --install-headers=
             - pip install -r requirements.txt -t archive-build-root
+            - cp -v infra/cloudformation/ebcf-alexa-lambda.template.yml archive-build-root/
 artifacts:
     files:
         - '**/*'

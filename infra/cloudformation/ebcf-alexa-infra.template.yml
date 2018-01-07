@@ -14,9 +14,9 @@ Parameters:
   GitHubOAuthToken:
     Type: String
     NoEcho: true
-  RolePath:
+  EnvName:
     Type: String
-    Default: '/ebcf-alexa/'
+    Default: test
 
 Resources:
   CODEPIPELINE:
@@ -51,20 +51,20 @@ Resources:
                 Provider: CodeBuild
                 Version: '1'
               Configuration:
-                ProjectName: !Ref CODEBUILD
+                ProjectName: !Ref CodeBuildEBCFAlexa
               InputArtifacts:
                   - Name: github-src
               OutputArtifacts:
                   - Name: ebcf-alexa
               Name: Build
 
-  CODEBUILD:
+  CodeBuildEBCFAlexa:
     Type: 'AWS::CodeBuild::Project'
     Properties:
         Artifacts:
             Type: CODEPIPELINE
         Description: 'Codebuild for ebcf-alexa'
-        Name: 'ebcf-alexa'
+        Name: !Sub '${EnvName}-build-ebcf-alexa'
         ServiceRole: !GetAtt [CodeBuilderRole, Arn]
         Source:
             Type: CODEPIPELINE
@@ -92,7 +92,7 @@ Resources:
               Service:
                 - codebuild.amazonaws.com
         Version: 2012-10-17
-      Path: !Ref RolePath
+      Path: /ebcf-alexa/
 
   CodePipelineRole:
     Type: 'AWS::IAM::Role'
@@ -106,7 +106,7 @@ Resources:
               Service:
                 - codepipeline.amazonaws.com
         Version: 2012-10-17
-      Path: !Ref RolePath
+      Path: /ebcf-alexa/
       Policies:
         - PolicyName: CodePipelineAccess
           PolicyDocument:
