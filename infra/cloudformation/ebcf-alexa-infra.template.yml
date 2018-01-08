@@ -67,7 +67,7 @@ Resources:
               InputArtifacts:
                   - Name: BuildArtifact
               Configuration:
-                  ActionMode: CREATE_UPDATE
+                  ActionMode: REPLACE_ON_FAILURE
                   StackName: !Sub '${EnvName}-ebcf-alexa-lambda'
                   Capabilities: CAPABILITY_IAM
                   TemplatePath: 'BuildArtifact::ebcf-alexa-lambda.template.yml'
@@ -199,3 +199,19 @@ Resources:
                 - cloudformation.amazonaws.com
         Version: 2012-10-17
       Path: /ebcf-alexa/
+      Policies:
+        - PolicyName: CFNLambdaRolePolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - 'iam:*'
+                  - 'lambda:*'
+                Effect: Allow
+                Resource: '*'
+              - Action:
+                  - 's3:GetObject'
+                  - 's3:GetObjectVersion'
+                Effect: Allow
+                Resource:
+                  - !Sub '${ArtifactBucket.Arn}/*'
