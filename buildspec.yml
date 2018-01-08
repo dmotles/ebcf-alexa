@@ -1,11 +1,16 @@
 version: 0.2
 
 phases:
+    install:
+        commands:
+            - echo `date`: Installing python dependencies
+            - pip install -r infra/requirements.txt
+            - pip install -r requirements.txt
     pre_build:
         commands:
-            - echo Running unit tests on `date`
-            - python3 setup.py test
-            - echo Validating lambda CFN template on `date`
+            - echo `date`: Running unit tests...
+            - py.test test
+            - echo `date`: Validating CFN Lambda Template
             - infra/validate-cfn infra/cloudformation/ebcf-alexa-lambda.template.yml
     build:
         commands:
