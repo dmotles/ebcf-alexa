@@ -1,0 +1,18 @@
+#!/bin/bash
+
+set -x
+set -e
+set -u
+
+INFRA_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+DOCKER_DIR=$INFRA_DIR/docker
+LOGIN_CMD=$(aws ecr get-login --no-include-email --region us-east-1)
+
+cd $DOCKER_DIR
+
+docker build -t ebcf-alexa .
+docker tag ebcf-alexa:latest 752373493987.dkr.ecr.us-east-1.amazonaws.com/ebcf-alexa:latest
+if ! docker push 752373493987.dkr.ecr.us-east-1.amazonaws.com/ebcf-alexa:latest; then
+    $LOGIN_CMD
+    docker push 752373493987.dkr.ecr.us-east-1.amazonaws.com/ebcf-alexa:latest
+fi
