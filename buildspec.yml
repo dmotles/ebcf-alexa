@@ -1,22 +1,19 @@
 version: 0.2
 
 phases:
-    install:
-        commands:
-            - 'echo `date`: Installing python dependencies'
-            - 'pip install -r infra/requirements.txt'
-            - 'pip install -r requirements.txt'
     pre_build:
         commands:
+            - 'echo `date`: Installing package for testing...'
+            - 'python setup.py install'
             - 'echo `date`: Running unit tests...'
             - 'py.test test'
             - 'echo `date`: Validating CFN Lambda Template'
             - 'infra/validate-cfn infra/cloudformation/ebcf-alexa-lambda.template.yml'
     build:
         commands:
-            - 'echo Starting build on `date`'
+            - 'echo `date`: Building Python Package'
             - >
-                python3 setup.py install
+                python setup.py install
                 --single-version-externally-managed
                 --root=archive-build-root
                 --install-base=
@@ -26,7 +23,9 @@ phases:
                 --install-data=
                 --install-platbase=
                 --install-headers=
+            - 'echo `date`: Installing dependencies'
             - 'pip install -r requirements.txt -t archive-build-root'
+            - 'echo `date`: Copying Lambda CFN Template'
             - 'cp -v infra/cloudformation/ebcf-alexa-lambda.template.yml archive-build-root/'
 artifacts:
     files:
