@@ -104,7 +104,7 @@ Resources:
                   - 's3:PutObject'
                 Effect: Allow
                 Resource:
-                  - 'arn:aws:s3:::codepipeline-us-east-1-*/*'
+                  - !Sub '${ArtifactBucket.Arn}/*'
               - Action:
                   - 'logs:CreateLogGroup'
                   - 'logs:CreateLogStream'
