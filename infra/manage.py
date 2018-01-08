@@ -66,7 +66,7 @@ def setup_logging():
 def main() -> int:
     setup_logging()
     template = load_template(TEMPLATE_PATH)
-    create_or_update_stack(TEST_STACK, 'default', template)
+    create_or_update_stack(TEST_STACK, 'test', template)
     # 3. merge old stack params with new stack params.
     # 3a. ask for missing values?
     # 4. do a stack update
