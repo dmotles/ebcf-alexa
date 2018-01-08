@@ -44,7 +44,7 @@ setup(
     author_email='seltom.dan@gmail.com',
     license='MIT',
     packages=['_ebcf_alexa'],
-    setup_requires=['pytest-runner', 'boto3', 'PyYAML'],
+    setup_requires=['pytest-runner'],
     tests_require=['pytest'],
     install_requires=['pytz'],
     cmdclass={'deploy': Deploy},
