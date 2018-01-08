@@ -40,7 +40,7 @@ Resources:
                 Branch: !Ref GitHubBranch
                 OAuthToken: !Ref GitHubOAuthToken
               OutputArtifacts:
-                  - Name: github-src
+                  - Name: GitHubSrc
               Name: GitHub
               RunOrder: 1
         - Name: Build
@@ -53,10 +53,39 @@ Resources:
               Configuration:
                 ProjectName: !Ref CodeBuildEBCFAlexa
               InputArtifacts:
-                  - Name: github-src
+                  - Name: GitHubSrc
               OutputArtifacts:
-                  - Name: ebcf-alexa
+                  - Name: BuildArtifact
               Name: Build
+        - Name: Test
+          Actions:
+            - ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormation
+                Version: '1'
+              InputArtifacts:
+                  - Name: BuildArtifact
+              Configuration:
+                  ActionMode: CREATE_UPDATE
+                  StackName: !Sub '${EnvName}-ebcf-alexa-lambda'
+                  Capabilities: CAPABILITY_IAM
+                  TemplatePath: 'BuildArtifact::ebcf-alexa-lambda.template.yml'
+                  RoleArn: !GetAtt [CFNLambdaRole, Arn]
+                  ParameterOverrides: |
+                      {
+                          "LambdaS3Bucket": {
+                              "Fn::GetArtifactAtt": [
+                                  "BuildArtifact", "BucketName"
+                                ]
+                            },
+                          "LambdaS3Key": {
+                              "Fn::GetArtifactAtt": [
+                                  "BuildArtifact", "ObjectKey"
+                                ]
+                            }
+                        }
+              Name: Deploy
 
   CodeBuildEBCFAlexa:
     Type: 'AWS::CodeBuild::Project'
@@ -156,3 +185,17 @@ Resources:
                   - 'codebuild:BatchGetBuilds'
                 Effect: Allow
                 Resource: '*'
+
+  CFNLambdaRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - 'sts:AssumeRole'
+            Effect: Allow
+            Principal:
+              Service:
+                - cloudformation.amazonaws.com
+        Version: 2012-10-17
+      Path: /ebcf-alexa/
