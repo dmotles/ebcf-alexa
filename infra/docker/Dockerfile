@@ -4,8 +4,12 @@ RUN apt-get update
 RUN apt-get upgrade -y
 RUN apt-get install zip -y
 
-RUN pip3 install awscli pytest boto3
+WORKDIR /build
+COPY requirements.txt requirements.txt
+COPY infra-requirements.txt infra-requirements.txt
 
-RUN pip3 install pytz
+RUN pip3 install -r infra-requirements.txt
+RUN pip3 install -r requirements.txt
+
 
 RUN echo "Built - nothing special"
