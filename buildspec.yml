@@ -8,7 +8,7 @@ phases:
             - 'echo `date`: Running unit tests...'
             - 'py.test test'
             - 'echo `date`: Validating CFN Lambda Template'
-            - 'infra/validate-cfn infra/cloudformation/ebcf-alexa-lambda.template.yml'
+            - 'aws cloudformation validate-template --template-body file://infra/cloudformation/ebcf-alexa-lambda.template.yml'
     build:
         commands:
             - 'echo `date`: Building Python Package'
