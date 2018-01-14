@@ -8,6 +8,13 @@ import io
 import pytest
 import urllib.parse as parse
 
+class TestWOD(object):
+    def test_rohan_forgot_to_put_conditioning_or_strength_in(self):
+        wods.WOD({'enabled': True, 'title': None, 'date': '2018-01-13T00:00:00.000Z',
+                  'publishDate': '2018-01-13T05:00:00.000Z', 'image': None, 'strength': None,
+                  'conditioning': None, 'description': None, 'videoId': None})
+
+
 SAMPLE_WOD_JSON = r"""
 {"links": {
     "self": "http://www.elliottbaycrossfit.com/api/v1/wods?filter%5Bsimple%5D%5Bdate%5D=2017-07-03T00%3A00%3A00.000Z&filter%5Bsimple%5D%5Benabled%5D=true"},
@@ -29,12 +36,28 @@ SAMPLE_WOD_JSON = r"""
 """.strip()
 
 
+BROKEN_WOD_JSON = r"""
+{"meta": {}, "links": {
+    "self": "http://www.elliottbaycrossfit.com/api/v1/wods?filter%5Bsimple%5D%5Bdate%5D=2018-01-13T00%3A00%3A00.000Z&filter%5Bsimple%5D%5Benabled%5D=true"},
+ "data": [{"id": "5a542d6ca8277d0004cc9df7", "type": "wods",
+           "attributes": {"enabled": true, "title": null, "date": "2018-01-13T00:00:00.000Z",
+                          "publishDate": "2018-01-13T05:00:00.000Z", "image": null, "strength": null,
+                          "conditioning": null, "description": null, "videoId": null},
+           "links": {"self": "http://localhost:4500/api/v1/wods/5a542d6ca8277d0004cc9df7"}, "relationships": {
+         "tags": {"data": [{"type": "tags", "id": "5a542d65a8277d0004cc9df5"}],
+                  "links": {"self": "http://localhost:4500/api/v1/wods/relationships/tags"}}}}]}
+""".strip()
+
+
 def mock_urlopen(urlstr: str):
     parsed = parse.urlparse(urlstr)
     query = parse.parse_qs(parsed.query)
+    query_date = query['filter[simple][date]'][0]
     # for some reason, parse_qs puts values inside lists.
-    if query['filter[simple][date]'][0] == '2017-07-03T00:00:00.000Z':
+    if query_date == '2017-07-03T00:00:00.000Z':
         return io.StringIO(SAMPLE_WOD_JSON)
+    elif query_date == '2018-01-13T00:00:00.000Z':
+        return io.StringIO(BROKEN_WOD_JSON)
     assert False, 'Mock not supported for this date'
 
 
@@ -81,6 +104,12 @@ def test_get_wod_e2e(fake_urlopen):
     assert wod.publish_datetime == datetime(2017, 7, 3, 4, tzinfo=env.UTC)
     assert wod.image == 'http://ebcf.s3.amazonaws.com/20170703.jpg'
     assert 'HAPPY BIRTHDAY KELSEY!!!!' in wod.announcement_lines
+
+
+def test_get_wod_e2e_broken_wod(fake_urlopen):
+    """see fixture setup. This is a workout without strength or conditioning,
+    so its pretty much empty"""
+    assert wods.get_wod(date(2018, 1, 13)) is None
 
 
 @pytest.mark.parametrize(

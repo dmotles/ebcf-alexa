@@ -56,6 +56,13 @@ def _split_announcement_and_strength(strength_raw: Optional[str]) -> Tuple[List[
     return announcement, lines
 
 
+def _get_conditioning(conditioning_raw: Optional[str]) -> List[str]:
+    """safely gets the conditioning part of the workout"""
+    if conditioning_raw is None:
+        return []
+    return conditioning_raw.strip().splitlines(False)
+
+
 class WOD(object):
     """
     Class representing a WOD from the EBCF API.
@@ -64,13 +71,16 @@ class WOD(object):
         self.announcement_lines, self.strength_lines = _split_announcement_and_strength(
             wod_attributes.get('strength', '')
         )
-        self.conditioning_lines = wod_attributes.get('conditioning', '').strip().splitlines(False)
+        self.conditioning_lines = _get_conditioning(wod_attributes.get('conditioning', ''))
         self.image = wod_attributes.get('image', None)
         self.datetime = _safe_datetime(wod_attributes.get('date'))
         self.date = None
         if self.datetime:
             self.date = self.datetime.date()
         self.publish_datetime = _safe_datetime(wod_attributes.get('publishDate'))
+
+    def has_content(self) -> bool:
+        return bool(self.announcement_lines or self.conditioning_lines or self.strength_lines)
 
     def announcement_ssml(self) -> str:
         if self.announcement_lines:
@@ -181,7 +191,9 @@ def _parse_wod_response(api_response: dict) -> Iterator[WOD]:
     wod_list = api_response.get('data', [])
     for wod_data in wod_list:
         try:
-            yield WOD(wod_data['attributes'])
+            wod = WOD(wod_data['attributes'])
+            if wod.has_content():
+                yield wod
         except KeyError:
             continue
 
