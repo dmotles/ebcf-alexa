@@ -7,6 +7,7 @@ set -u
 INFRA_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 DOCKER_DIR=$INFRA_DIR/docker
 LOGIN_CMD=$(aws ecr get-login --no-include-email --region us-east-1)
+AWS_ACCOUNT_ID=$($INFRA_DIR/aws-account-id)
 
 cp $INFRA_DIR/requirements.txt $DOCKER_DIR/infra-requirements.txt
 cp $INFRA_DIR/../requirements.txt $DOCKER_DIR/
@@ -14,8 +15,8 @@ cp $INFRA_DIR/../requirements.txt $DOCKER_DIR/
 cd $DOCKER_DIR
 
 docker build -t ebcf-alexa .
-docker tag ebcf-alexa:latest 752373493987.dkr.ecr.us-east-1.amazonaws.com/ebcf-alexa:latest
-if ! docker push 752373493987.dkr.ecr.us-east-1.amazonaws.com/ebcf-alexa:latest; then
+docker tag ebcf-alexa:latest ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/ebcf-alexa:latest
+if ! docker push ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/ebcf-alexa:latest; then
     $LOGIN_CMD
-    docker push 752373493987.dkr.ecr.us-east-1.amazonaws.com/ebcf-alexa:latest
+    docker push ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/ebcf-alexa:latest
 fi

@@ -1,0 +1,14 @@
+#!/usr/bin/env python3
+import boto3
+
+
+sts = boto3.client('sts')
+
+
+def main():
+    account_id = sts.get_caller_identity()['Account']
+    print(account_id)
+
+
+if __name__ == '__main__':
+    main()
