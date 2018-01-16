@@ -1,6 +1,9 @@
 # vim: ft=yaml
 AWSTemplateFormatVersion: 2010-09-09
 
+Description: >
+  Main infrastructure pipeline for ebcf-alexa
+
 Parameters:
   GitHubUser:
     Type: String
@@ -107,9 +110,12 @@ Resources:
 
 ##
 #  DockerImage Infra
+#
+# Building the lambda slug requires a docker image setup with the right build dependencies.
+# This is the ECS/ECR docker repo that will store the image for CodeBuild
 ##
 
-  CodeBuildDockerImageRepository:
+  DockerRepo:
     Type: 'AWS::ECR::Repository'
     Properties:
       RepositoryName: !Sub 'ebcf-alexa-${EnvName}'
@@ -149,6 +155,79 @@ Resources:
               }
             ]
           }
+
+  DockerImageBuild:
+    Type: 'AWS::CodeBuild::Project'
+    Properties:
+      Artifacts:
+        Type: CODEPIPELINE
+      Description: 'Docker Image used to build ebcf-alexa'
+      Name: !Sub 'docker-ebcf-alexa-${EnvName}'
+      ServiceRole: !GetAtt [CodeBuilderRole, Arn]
+      Source:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        Image: 'aws/codebuild/docker:17.09.0'
+        ComputeType: BUILD_GENERAL1_SMALL
+        EnvironmentVariables:
+          - Name: AWS_ACCOUNT_ID
+            Type: PLAINTEXT
+            Value: !Ref 'AWS::AccountId'
+          - Name: 'AWS_DEFAULT_REGION'
+            Type: PLAINTEXT
+            Value: !Ref 'AWS::Region'
+          - Name: IMAGE_REPO_NAME
+            Type: PLAINTEXT
+            Value: !Ref DockerRepo
+          - Name: IMAGE_TAG
+            Type: PLAINTEXT
+            Value: latest
+
+  DockerImageBuildIAMRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - 'sts:AssumeRole'
+            Effect: Allow
+            Principal:
+              Service:
+                - codebuild.amazonaws.com
+        Version: 2012-10-17
+      Path: /ebcf-alexa/
+      Policies:
+        - PolicyName: CodeBuildPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - 's3:GetObject'
+                  - 's3:GetObjectVersion'
+                Effect: Allow
+                Resource:
+                  - !Sub '${ArtifactBucket.Arn}/*'
+              - Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Effect: Allow
+                Resource:
+                  - !Sub 'arn:aws:logs:us-east-1:${AWS::AccountId}:log-group:/aws/codebuild/docker-ebcf-alexa-${EnvName}'
+                  - !Sub 'arn:aws:logs:us-east-1:${AWS::AccountId}:log-group:/aws/codebuild/docker-ebcf-alexa-${EnvName}'
+              - Action:
+                  - 'ecr:BatchCheckLayerAvailability'
+                  - 'ecr:CompleteLayerUpload'
+                  - 'ecr:GetAuthorizationToken'
+                  - 'ecr:InitiateLayerUpload'
+                  - 'ecr:PutImage'
+                  - 'ecr:UploadLayerPart'
+                Effect: Allow
+                Resource: !Sub 'arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/${DockerRepo}'
+
+
+
 
 ##
 # IAM ROLES

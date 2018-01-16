@@ -5,6 +5,7 @@ import uuid
 from typing import Optional, List, Callable, Dict, Set, AbstractSet, Generator
 
 import boto3
+from botocore.exceptions import ClientError
 
 from .constants import REGION
 
@@ -43,6 +44,7 @@ STEADY_STATE = (
         CREATE_FAILURE_STEADY_STATES |
         DELETE_FAILURE_STATES
 )
+DELETABLE_STATES = CREATE_FAILURE_STEADY_STATES | DELETE_FAILURE_STATES
 
 
 def create_cfn_resource():
@@ -66,6 +68,11 @@ class StackEvent(object):
             '{0.logical_resource_id} [{0.physical_resource_id}] of type '
             '{0.resource_type} {0.resource_status} because {0.status_reason}'
         ).format(self)
+
+
+def _err_is_stack_does_not_exist(err: ClientError) -> bool:
+    return err.response['Error']['Code'] == 'ValidationError' and \
+           'does not exist' in err.response['Error']['Message']
 
 
 class Stack(object):
@@ -93,16 +100,24 @@ class Stack(object):
     def parameter_keys(self) -> Set[str]:
         return set(p['ParameterKey'] for p in self._resource.parameters)
 
-    def wait_for(self, done_states: AbstractSet[str], fail_states: AbstractSet[str]):
+    def wait_for(self, done_states: AbstractSet[str], fail_states: AbstractSet[str], delete: bool=False):
         exit_loop_states = done_states | fail_states
         while self.status not in exit_loop_states:
             LOG.debug('Stack %s in status %s because %s',
                       self.name, self.status, self.status_reason)
             time.sleep(10) # 10 seconds seems like a good poll interval
-            self._resource.reload()
+            try:
+                self._resource.reload()
+            except ClientError as err:
+                if _err_is_stack_does_not_exist(err):
+                    if delete:
+                        LOG.debug('%s no longer exists', self.name)
+                        return
+                    raise StackDoesNotExist(self.name, self)
+                raise
         if self.status in fail_states:
             raise StackFailure(
-                '{}: {}'.format(self.status, self.status_reason),
+                'Fail state {} reason: {}'.format(self.status, self.status_reason),
                 self
             )
 
@@ -130,12 +145,26 @@ class Stack(object):
 
     def iter_failed_stack_events(self) -> Generator[StackEvent, None, None]:
         fail_statuses = UPDATE_FAILURE_STEADY_STATES | CREATE_FAILURE_STEADY_STATES
+        last_request_token = self._last_request_token
         for event_resource in self._resource.events.all():
-            if self._last_request_token is not None and \
-                    event_resource.client_request_token != self._last_request_token:
+            if last_request_token is None:  # lets just go through the last set of events
+                last_request_token = event_resource.client_request_token
+            if event_resource.client_request_token != last_request_token:
                 continue
             if event_resource.resource_status in fail_statuses:
                 yield StackEvent(event_resource)
+
+    def delete(self, block: bool=True, retain_resource_logical_ids: Optional[List[str]]=None):
+        if not retain_resource_logical_ids:
+            retain_resource_logical_ids = []
+
+        self._last_request_token = generate_client_request_token()
+        self._resource.delete(
+            ClientRequestToken=self._last_request_token,
+            RetainResources=retain_resource_logical_ids
+        )
+        if block:
+            self.wait_for(STEADY_STATE, DELETE_FAILURE_STATES, delete=True)
 
 
 class Client(object):
@@ -170,8 +199,12 @@ class Client(object):
         return stack
 
     def get_stack(self, name: str) -> Optional[Stack]:
-        for s in self._resource.stacks.filter(StackName=name):
-            return Stack(s)
+        try:
+            for s in self._resource.stacks.filter(StackName=name):
+                return Stack(s)
+        except ClientError as err:
+            if not _err_is_stack_does_not_exist(err):
+                raise
         return None
 
 
@@ -179,6 +212,10 @@ class StackFailure(Exception):
     def __init__(self, msg, stack: Stack):
         super().__init__(msg)
         self.stack = stack
+
+
+class StackDoesNotExist(StackFailure):
+    """A stack failure when stack DNE"""
 
 
 class Template(object):

@@ -22,6 +22,26 @@ def get_stack_config(env_name: str) -> dict:
     return table.get_row(env_name=env_name)
 
 
+def update_stack(stack: cfn.Stack, template: cfn.Template, config: dict):
+    LOG.debug('%s already exists', stack.name)
+    try:
+        stack.wait_for(cfn.STEADY_STATE, fail_states=cfn.DELETABLE_STATES)
+    except cfn.StackFailure as stack_fail:
+        if not isinstance(stack_fail, cfn.StackDoesNotExist):
+            LOG.error('Stack %s was left in a bad state from the last run: %s',
+                      stack.name, str(stack_fail))
+            for stack_event in stack.iter_failed_stack_events():
+                LOG.error(str(stack_event))
+            LOG.debug('%s will be now be deleted because it is in state %s',
+                      stack.name, stack.status)
+            stack.delete()
+        # else, we just recreate it
+        LOG.debug('recreating %s', stack.name)
+        template.create_stack(stack.name, config)
+    else:
+        template.update_stack(stack, config)
+
+
 def create_or_update_stack(name: str,
                            config_env: str,
                            template: cfn.Template,
@@ -35,8 +55,7 @@ def create_or_update_stack(name: str,
             LOG.debug('Creating stack: %s', name)
             template.create_stack(name, config)
         else:
-            LOG.debug('%s already exists', name)
-            template.update_stack(stack, config)
+            update_stack(stack, template, config)
     except cfn.StackFailure as fail:
         LOG.error(str(fail))
         for stack_event in fail.stack.iter_failed_stack_events():
