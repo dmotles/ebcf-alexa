@@ -106,6 +106,51 @@ Resources:
     Type: 'AWS::S3::Bucket'
 
 ##
+#  DockerImage Infra
+##
+
+  CodeBuildDockerImageRepository:
+    Type: 'AWS::ECR::Repository'
+    Properties:
+      RepositoryName: !Sub 'ebcf-alexa-${EnvName}'
+      RepositoryPolicyText: |
+        {
+          "Version": "2008-10-17",
+          "Statement": [
+            {
+              "Sid": "CodeBuildAccess",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "codebuild.amazonaws.com"
+              },
+              "Action": [
+                "ecr:GetDownloadUrlForLayer",
+                "ecr:BatchGetImage",
+                "ecr:BatchCheckLayerAvailability"
+              ]
+            }
+          ]
+        }
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 10,
+                "description": "Keep only 10 untagged",
+                "selection": {
+                  "tagStatus": "untagged",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 10
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
+
+##
 # IAM ROLES
 ##
 
