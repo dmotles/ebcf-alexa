@@ -7,10 +7,13 @@ Parameters:
         Type: String
     LambdaS3Key:
         Type: String
+    LambdaFunctionName:
+        Type: String
 Resources:
     LAMBDA:
         Type: 'AWS::Lambda::Function'
         Properties:
+            FunctionName: !Ref LambdaFunctionName
             Code:
                 S3Bucket: !Ref LambdaS3Bucket
                 S3Key: !Ref LambdaS3Key

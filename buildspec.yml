@@ -27,6 +27,7 @@ phases:
             - 'pip install -r requirements.txt -t archive-build-root'
             - 'echo `date`: Copying Lambda CFN Template'
             - 'cp -v infra/cloudformation/ebcf-alexa-lambda.template.yml archive-build-root/'
+            - 'cp -v infra/cloudformation/ebcf-alexa-lambda.config.*.json archive-build-root/'
 artifacts:
     files:
         - '**/*'

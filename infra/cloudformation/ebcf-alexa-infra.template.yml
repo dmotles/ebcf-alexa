@@ -88,6 +88,7 @@ Resources:
                 StackName: !Sub '${EnvName}-TestStage-ebcf-alexa-lambda'
                 Capabilities: CAPABILITY_IAM
                 TemplatePath: 'BuildArtifact::ebcf-alexa-lambda.template.yml'
+                TemplateConfiguration: 'BuildArtifact::ebcf-alexa-lambda.config.test.json'
                 RoleArn: !GetAtt [CFNLambdaRole, Arn]
                 ParameterOverrides: |
                       {
