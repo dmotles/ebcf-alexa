@@ -20,8 +20,13 @@ Parameters:
   EnvName:
     Type: String
     Default: test
+  CodePipelineSNSTopic:
+    Type: String
 
 Resources:
+  ##
+  # CODE PIPELINE DEFINITION
+  ##
   CODEPIPELINE:
     Type: 'AWS::CodePipeline::Pipeline'
     Properties:
@@ -30,9 +35,12 @@ Resources:
           Type: S3
       RoleArn: !GetAtt [CodePipelineRole, Arn]
       Stages:
-        - Name: Source
+        - Name: SourceStage
           Actions:
-            - ActionTypeId:
+            # 1. Get source from github
+            - Name: GitHub
+              RunOrder: '1'
+              ActionTypeId:
                 Category: Source
                 Owner: ThirdParty
                 Provider: GitHub
@@ -43,12 +51,14 @@ Resources:
                 Branch: !Ref GitHubBranch
                 OAuthToken: !Ref GitHubOAuthToken
               OutputArtifacts:
-                  - Name: GitHubSrc
-              Name: GitHub
-              RunOrder: 1
-        - Name: Build
+                - Name: GitHubSrc
+
+        - Name: BuildStage
           Actions:
-            - ActionTypeId:
+            # 2. build an unit test the code.
+            - Name: BuildAndUnitTest
+              RunOrder: '2'
+              ActionTypeId:
                 Category: Build
                 Owner: AWS
                 Provider: CodeBuild
@@ -59,23 +69,27 @@ Resources:
                   - Name: GitHubSrc
               OutputArtifacts:
                   - Name: BuildArtifact
-              Name: Build
-        - Name: Test
+
+        - Name: TestStage
           Actions:
-            - ActionTypeId:
+            # 3. deploy a test version of the lambda function.
+            # XXX: eventually we'll want to run integ tests here.
+            - Name: CreateTestStack
+              RunOrder: '1'
+              ActionTypeId:
                 Category: Deploy
                 Owner: AWS
                 Provider: CloudFormation
                 Version: '1'
               InputArtifacts:
-                  - Name: BuildArtifact
+                - Name: BuildArtifact
               Configuration:
-                  ActionMode: REPLACE_ON_FAILURE
-                  StackName: !Sub '${EnvName}-ebcf-alexa-lambda'
-                  Capabilities: CAPABILITY_IAM
-                  TemplatePath: 'BuildArtifact::ebcf-alexa-lambda.template.yml'
-                  RoleArn: !GetAtt [CFNLambdaRole, Arn]
-                  ParameterOverrides: |
+                ActionMode: REPLACE_ON_FAILURE
+                StackName: !Sub '${EnvName}-TestStage-ebcf-alexa-lambda'
+                Capabilities: CAPABILITY_IAM
+                TemplatePath: 'BuildArtifact::ebcf-alexa-lambda.template.yml'
+                RoleArn: !GetAtt [CFNLambdaRole, Arn]
+                ParameterOverrides: |
                       {
                           "LambdaS3Bucket": {
                               "Fn::GetArtifactAtt": [
@@ -89,6 +103,33 @@ Resources:
                             }
                         }
               Name: Deploy
+
+            # 4. Manual approval for now.
+            - Name: ApproveTestStack
+              RunOrder: '2'
+              ActionTypeId:
+                Category: Approval
+                Owner: AWS
+                Provider: Manual
+                Version: '1'
+              Configuration:
+                NotificationArn: !Ref CodePipelineSNSTopic
+                CustomData: !Sub |
+                  Do you want to create a change set against the production stack and delete
+                  the ${EnvName}-TestStage-ebcf-alexa-lambda stack?
+            # 5. Delete after approval.
+            - Name: DeleteTestStack
+              RunOrder: '3'
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormation
+                Version: '1'
+              Configuration:
+                ActionMode: DELETE_ONLY
+                RoleArn: !GetAtt [CFNLambdaRole, Arn]
+                StackName: !Sub '${EnvName}-TestStage-ebcf-alexa-lambda'
+
 
   CodeBuildEBCFAlexa:
     Type: 'AWS::CodeBuild::Project'
