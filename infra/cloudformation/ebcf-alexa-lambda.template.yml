@@ -5,10 +5,33 @@ Description: >
 Parameters:
     LambdaS3Bucket:
         Type: String
+        MinLength: 3
+        MaxLength: 63
+        AllowedPattern: '(\p{Alnum}[\p{Alnum}-]*\.)*(\p{Alnum}[\p{Alnum}-]*)$'
+        Description: S3 bucket where the function code lives
+        ConstraintDescription: >
+          S3 bucket names have alphanumeric characters, dashes, and dots
+          according to s3 docs.
     LambdaS3Key:
         Type: String
+        MinLength: 1
+        MaxLength: 1024
+        Description: Where in the s3 bucket the lambda function is located
+        ConstraintDescription: Max key length is 1024 chars according to s3 docs.
     LambdaFunctionName:
         Type: String
+        MinLength: 1
+        MaxLength: 140
+        AllowedPattern: >
+          (arn:aws:lambda:)?
+          ([a-z]{2}-[a-z]+-\d{1}:)?
+          (\d{12}:)?
+          (function:)?
+          ([a-zA-Z0-9-_]+)
+          (:(\$LATEST|[a-zA-Z0-9-_]+))?
+        ConstraintDescription: >
+          Documented AWS Lambda function name restrictions.
+
 Resources:
     LAMBDA:
         Type: 'AWS::Lambda::Function'
