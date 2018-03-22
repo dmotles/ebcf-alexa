@@ -7,6 +7,8 @@ from unittest.mock import patch, Mock
 import io
 import pytest
 import urllib.parse as parse
+from urllib.error import HTTPError
+from http.client import HTTPMessage
 
 class TestWOD(object):
     def test_rohan_forgot_to_put_conditioning_or_strength_in(self):
@@ -109,6 +111,16 @@ def test_get_wod_e2e(fake_urlopen):
 def test_get_wod_e2e_broken_wod(fake_urlopen):
     """see fixture setup. This is a workout without strength or conditioning,
     so its pretty much empty"""
+    assert wods.get_wod(date(2018, 1, 13)) is None
+
+
+def test_get_wod_with_401_error(fake_urlopen):
+    """
+    The EBCF website returns 401's for workouts that are not yet released.
+    """
+    def raise_401(url):
+        raise HTTPError(url, 401, 'UNAUTHORIZED', HTTPMessage(), fp=None)
+    fake_urlopen.side_effect = raise_401
     assert wods.get_wod(date(2018, 1, 13)) is None
 
 

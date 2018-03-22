@@ -1,5 +1,6 @@
 from urllib.request import urlopen
 from urllib.parse import urlencode
+from urllib.error import HTTPError
 import json
 import logging
 from datetime import datetime, date as Date
@@ -182,8 +183,15 @@ def _call_api(params: dict) -> dict:
     LOG.debug('EBCF API params: %s', params)
     query_url = URL + _urlencode_multilevel(params)
     LOG.debug('HTTP GET %s', query_url)
-    with urlopen(query_url) as f:
-        return json.load(f)
+    try:
+        with urlopen(query_url) as f:
+            return json.load(f)
+    except HTTPError as http_error:
+        if http_error.code == 401:
+            # indicates that the wod is not yet released AFAIK
+            return {}
+        else:
+            raise
 
 
 def _parse_wod_response(api_response: dict) -> Iterator[WOD]:
